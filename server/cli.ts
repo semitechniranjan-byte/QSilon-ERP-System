@@ -35,7 +35,12 @@ try {
   } else if (cmd === 'seed-demo') {
     await migrate(() => {});
     const { seedDemo } = await import('./seed/demo.js');
-    await seedDemo();
+    const r = await seedDemo({ password: process.env.DEMO_PASSWORD || null });
+    console.log('\nTeachers (login ID):');
+    for (const t of r.teachers) console.log(`  ${t.name.padEnd(20)} ${t.username}`);
+    console.log('\nSome students (login ID):');
+    for (const s of r.students) console.log(`  ${s.className.padEnd(4)} ${s.name.padEnd(20)} ${s.username}`);
+    console.log(r.password ? '\nAll sample accounts use the DEMO_PASSWORD you provided.' : '\nSet DEMO_PASSWORD=... to give all sample accounts one password.');
   } else if (cmd === 'remove-demo') {
     const { removeDemo } = await import('./seed/demo.js');
     await removeDemo();

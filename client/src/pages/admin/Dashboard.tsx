@@ -19,6 +19,7 @@ export default function AdminDashboard() {
         </>} />
       <Async q={q}>{(d: any) => (
         <div className="space-y-6">
+          {d.demoLoaded && <div className="card flex flex-wrap items-center gap-3 border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><AlertTriangle className="h-4 w-4" />Sample data is loaded for demonstration. <Link className="link" to="/admin/settings?tab=demo">Remove it</Link> before entering real school data.</div>}
           {!d.year && <div className="card flex items-center gap-3 border-amber-200 bg-amber-50 p-4 text-amber-900"><AlertTriangle className="h-5 w-5" />No current academic year. <Link className="link" to="/admin/settings">Create one in Settings</Link>.</div>}
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
             <StatCard label={t('Total students')} value={d.counts.students} icon={<GraduationCap className="h-5 w-5" />} to="/admin/students" />

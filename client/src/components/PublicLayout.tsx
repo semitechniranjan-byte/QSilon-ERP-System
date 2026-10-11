@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { Link, NavLink, Outlet } from 'react-router-dom';
-import { Mail, MapPin, Menu, Phone, X } from 'lucide-react';
+import { Clock, Mail, MapPin, Menu, Phone, X } from 'lucide-react';
 import { useI18n } from '../lib/i18n';
 import { useApi } from './ui';
 import { LangToggle } from './LangToggle';
@@ -12,7 +12,7 @@ export const usePublicSite = () => useApi<PublicSite>('/api/public/site');
 export function SchoolLogo({ fileId, name, className = 'h-10 w-10' }: { fileId?: string | null; name: string; className?: string }) {
   if (fileId) return <img src={`/api/files/${fileId}`} alt={`${name} logo`} className={`${className} rounded-lg object-contain`} />;
   return (
-    <div className={`${className} flex items-center justify-center rounded-lg bg-brand-600 font-bold text-white`} aria-hidden>
+    <div className={`${className} flex items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-800 font-bold text-white shadow-sm ring-2 ring-accent-400/60`} aria-hidden>
       {name.split(/\s+/).map((w) => w[0]).slice(0, 2).join('')}
     </div>
   );
@@ -35,17 +35,18 @@ export function PublicLayout({ children }: { children?: ReactNode }) {
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3">
           <Link to="/" className="flex min-w-0 items-center gap-3">
-            {s && <SchoolLogo fileId={s.logoFileId} name={s.name} />}
-            <span className="truncate text-base font-semibold text-brand-800 sm:text-lg">{name}</span>
+            {s && <SchoolLogo fileId={s.logoFileId} name={s.name} className="h-11 w-11 shrink-0" />}
+            <span className="min-w-0"><span className="block truncate text-base font-bold leading-tight text-brand-800 sm:text-lg">{name}</span>
+              {s?.tagline && <span className="hidden truncate text-xs text-slate-500 sm:block">{pick(s.tagline, s.taglineHi)}</span>}</span>
           </Link>
-          <nav className="hidden items-center gap-1 xl:flex" aria-label="Main">
+          <nav className="hidden items-center gap-0.5 xl:flex" aria-label="Main">
             {NAV.map(([to, label]) => (
-              <NavLink key={to} to={to} end={to === '/'} className={({ isActive }) => `rounded-md px-2.5 py-1.5 text-sm ${isActive ? 'bg-brand-50 font-medium text-brand-700' : 'text-slate-600 hover:text-brand-700'}`}>{t(label)}</NavLink>
+              <NavLink key={to} to={to} end={to === '/'} className={({ isActive }) => `whitespace-nowrap rounded-md px-2 py-1.5 text-sm ${isActive ? 'bg-brand-50 font-medium text-brand-700' : 'text-slate-600 hover:text-brand-700'}`}>{t(label)}</NavLink>
             ))}
           </nav>
           <div className="flex items-center gap-2">
             <LangToggle className="hidden sm:inline-flex" />
-            <Link to="/admission" className="btn-secondary btn-sm hidden md:inline-flex">{t('Admission Enquiry')}</Link>
+            <Link to="/admission" className="btn-secondary btn-sm hidden whitespace-nowrap md:inline-flex xl:hidden 2xl:inline-flex">{t('Admission Enquiry')}</Link>
             <Link to={user ? homeFor(user) : '/login'} className="btn-primary btn-sm">{user ? t('Dashboard') : t('Login')}</Link>
             <button className="btn-ghost p-2 xl:hidden" onClick={() => setOpen(!open)} aria-label="Menu" aria-expanded={open}>{open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}</button>
           </div>
@@ -72,6 +73,7 @@ export function PublicLayout({ children }: { children?: ReactNode }) {
             {s?.address && <p className="flex gap-2"><MapPin className="mt-0.5 h-4 w-4 shrink-0" />{[s.address, s.city, s.state, s.pincode].filter(Boolean).join(', ')}</p>}
             {s?.phone && <p className="flex gap-2"><Phone className="h-4 w-4" /><a href={`tel:${s.phone}`} className="hover:text-white">{s.phone}</a></p>}
             {s?.email && <p className="flex gap-2"><Mail className="h-4 w-4" /><a href={`mailto:${s.email}`} className="hover:text-white">{s.email}</a></p>}
+            {s?.schoolHours && <p className="flex gap-2"><Clock className="h-4 w-4" />{pick(s.schoolHours, s.schoolHoursHi)}</p>}
           </div>
           <div className="grid grid-cols-2 gap-1 text-sm">
             {NAV.slice(1).map(([to, label]) => <Link key={to} to={to} className="hover:text-white">{t(label)}</Link>)}

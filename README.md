@@ -1,4 +1,4 @@
-# School Management System
+# Future Creations Public School – School Management System
 
 A full-stack school ERP for a school with **Preschool (Playgroup–UKG) through Class 12**, CBSE/BSEB boards,
 English/Hindi medium, hostel residents, day scholars and optional transport. It includes a public website,
@@ -35,14 +35,17 @@ No other paid service is required.
 | `DATABASE_URL` | yes | Your Render PostgreSQL **Internal Database URL** (Database → Connect → Internal). Paste it here only — never in code or chat. |
 | `SESSION_SECRET` | yes | A long random string (the Blueprint generates one automatically). |
 | `NODE_ENV` | yes | `production` |
-| `SETUP_TOKEN` | first run | Any secret phrase. Lets you create the first Principal account from `/setup`. Remove it after setup. |
+| `ADMIN_USERNAME` | first run | Principal login ID, e.g. `principal`. With `ADMIN_PASSWORD`, the Principal account is created automatically when the server starts (only if no administrator exists yet). |
+| `ADMIN_PASSWORD` | first run | Principal password (min 8 characters). You can remove both variables after the first successful sign-in. |
+| `SETUP_TOKEN` | optional | Alternative to the two variables above: any secret phrase that lets you create the first Principal account from `/setup`. |
 | `DB_SCHEMA` | only if needed | e.g. `sms` — installs all tables into a separate schema (see “Existing databases”). |
 | `SESSION_MAX_AGE_HOURS` | optional | Sign-in session length, default `8`. |
 | `RUN_MIGRATIONS_ON_START` | optional | `true` to run migrations when the server starts (use if your plan has no pre-deploy command). |
 
 ### Step 3 – Deploy and create the Principal account
 1. Deploy. The pre-deploy command runs the database migrations (safe to run on every deploy).
-2. Open `https://<your-service>.onrender.com/setup`, enter the `SETUP_TOKEN`, the school name, and the Principal's user ID and password.
+   If `ADMIN_USERNAME` and `ADMIN_PASSWORD` are set, the Principal account already exists — just sign in at `/login`.
+2. Otherwise open `https://<your-service>.onrender.com/setup`, enter the `SETUP_TOKEN`, the school name, and the Principal's user ID and password.
    *Alternative:* in Render → Shell run `ADMIN_USERNAME=principal ADMIN_NAME="Principal" ADMIN_PASSWORD='...' node dist/server/cli.js create-admin`.
 3. Delete `SETUP_TOKEN` from the environment (setup is also disabled automatically once an administrator exists).
 
@@ -58,10 +61,17 @@ No other paid service is required.
 9. **Fees → Invoices → Generate invoices** each month (or for a range of months). Then collect fees.
 10. **Website:** edit page content, facilities and gallery.
 
-### Optional demo data
-To try the system with sample data (clearly marked “(Demo)” / “[DEMO]”): Render Shell → `node dist/server/cli.js seed-demo`.
-Remove it before going live: `node dist/server/cli.js remove-demo`. Removal deletes only demo-flagged records; anything a
-real record still uses (e.g. a section a real student is in) is kept.
+### Sample data for demonstrations
+Sign in as Principal → **Settings → Sample data**, choose one password for all sample accounts and click **Load sample data**.
+It creates 9 teachers, ~70 students (Playgroup–Class 12), a timetable, a month of attendance, invoices and payments, published
+Unit Test results, preschool progress cards, homework, quizzes, notices and events, and lists the sample login IDs.
+**Remove sample data** (same page) deletes only those tagged records — real records are never touched. A banner on the dashboard
+reminds you while sample data is loaded. (CLI alternative: `DEMO_PASSWORD=... node dist/server/cli.js seed-demo` / `remove-demo`.)
+
+### Logins for teachers and students
+When the Principal adds a teacher or student, the system generates the **ID** (e.g. `TCH0001`, `STU20260001`), which is the
+login ID. The Principal can type any password (min 6 characters) on the same form, or leave it empty to generate a temporary
+password that must be changed at first sign-in. **Set password** on a teacher's or student's profile changes it later.
 
 ---
 

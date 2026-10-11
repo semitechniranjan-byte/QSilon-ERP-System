@@ -45,7 +45,7 @@ publicRouter.get('/site', ah(async (_req, res) => {
       name: s.name, nameHi: s.name_hi, tagline: s.tagline, taglineHi: s.tagline_hi, logoFileId: s.logo_file_id, heroImageFileId: s.hero_image_file_id,
       address: s.address, city: s.city, state: s.state, pincode: s.pincode, phone: s.phone, email: s.email, website: s.website, mapUrl: s.map_url,
       establishedYear: s.established_year, principalName: s.principal_name, about: s.about, aboutHi: s.about_hi, mission: s.mission, missionHi: s.mission_hi,
-      enquiryEnabled: s.enquiry_enabled,
+      enquiryEnabled: s.enquiry_enabled, schoolHours: s.school_hours, schoolHoursHi: s.school_hours_hi,
     },
     stats, pages, facilities, gallery, notices, events, classes, boards, mediums, routes, hostels,
   });

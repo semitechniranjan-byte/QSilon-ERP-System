@@ -94,7 +94,7 @@ export function StatCard({ label, value, icon, hint, to, tone = 'brand' }: { lab
     <div className="card flex items-start gap-3 p-4 transition hover:shadow-md">
       {icon && <div className={`rounded-lg p-2 ${toneCls}`}>{icon}</div>}
       <div className="min-w-0">
-        <p className="truncate text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
+        <p className="text-xs font-medium uppercase leading-tight tracking-wide text-slate-500">{label}</p>
         <p className="mt-0.5 text-2xl font-semibold text-slate-900">{value}</p>
         {hint && <p className="mt-0.5 text-xs text-slate-500">{hint}</p>}
       </div>

@@ -5,7 +5,7 @@ import { ah, badRequest, conflict, notFound } from '../lib/errors.js';
 import { assertStudentAccess, can, requirePerm } from '../middleware/auth.js';
 import { audit } from '../lib/audit.js';
 import { bool, date, email, id, optDate, optId, optStr, phone, str } from '../lib/validate.js';
-import { hashPassword, tempPassword } from '../lib/passwords.js';
+import { assertAdminSetPassword, hashPassword, initialPassword, tempPassword } from '../lib/passwords.js';
 import { nextCounter, pad } from '../lib/counters.js';
 import { resolveYear, settings } from '../lib/context.js';
 import { todayIST } from '../lib/dates.js';
@@ -137,11 +137,11 @@ studentsRouter.post('/', requirePerm('students.manage'), ah(async (req, res) => 
     admissionDate: optDate, guardians: z.array(guardianSchema).min(1, 'Add at least one parent/guardian').max(4),
     enrollment: enrollmentSchema, feePlanIds: z.array(id).max(3).default([]), confirmDuplicate: bool.optional(), isDemo: bool.optional(),
     documents: z.array(z.object({ fileId: z.string().uuid(), docType: str(60) })).max(10).optional(),
+    password: optStr(128).optional(),
   }).parse(req.body);
   if (b.enrollment.transportOpted && !b.enrollment.transportRouteId) throw badRequest('Choose a transport route.');
   const s = await settings();
-  const pw = tempPassword();
-  const hash = await hashPassword(pw);
+  const cred = await initialPassword(b.password);
   const out = await tx(async (c) => {
     if (!b.confirmDuplicate) {
       const d = await findDuplicates(c, b.firstName, b.lastName, b.dob, b.guardians[0]?.phone ?? null);
@@ -159,7 +159,7 @@ studentsRouter.post('/', requirePerm('students.manage'), ah(async (req, res) => 
     const an = await nextCounter(c, 'admission_no');
     const admissionNo = `${s.admission_prefix}${pad(an, 5)}`;
     const name = [b.firstName, b.lastName].filter(Boolean).join(' ');
-    const u = await one(`INSERT INTO users (username, password_hash, role, display_name, is_demo) VALUES ($1,$2,'student',$3,$4) RETURNING id`, [studentCode, hash, name, !!b.isDemo], c);
+    const u = await one(`INSERT INTO users (username, password_hash, role, display_name, is_demo, must_change_password) VALUES ($1,$2,'student',$3,$4,$5) RETURNING id`, [studentCode, cred.hash, name, !!b.isDemo, cred.mustChange], c);
     const st = await one(
       `INSERT INTO students (user_id, student_code, admission_no, first_name, last_name, name_hi, dob, gender, blood_group, photo_file_id, address,
                              emergency_contact_name, emergency_contact_phone, previous_school, previous_class, admission_date, is_demo)
@@ -181,7 +181,7 @@ studentsRouter.post('/', requirePerm('students.manage'), ah(async (req, res) => 
     await audit(req, 'student.admit', 'student', st.id, { studentCode, admissionNo, sectionId: sec.id, rollNo: roll }, c);
     return { student: st, enrollment: e };
   });
-  res.status(201).json({ ...out, username: out.student.student_code, temporaryPassword: pw });
+  res.status(201).json({ ...out, username: out.student.student_code, password: cred.password, mustChange: cred.mustChange, temporaryPassword: cred.mustChange ? cred.password : undefined });
 }));
 
 // ---------- Profile ----------
@@ -356,6 +356,18 @@ studentsRouter.post('/:id/readmit', requirePerm('students.manage'), ah(async (re
     await audit(req, 'student.readmit', 'student', sid, { sectionId: sec.id }, c);
   });
   res.json({ ok: true });
+}));
+
+studentsRouter.post('/:id/set-password', requirePerm('students.manage', 'users.manage'), ah(async (req, res) => {
+  const sid = id.parse(req.params.id);
+  const { password, mustChange } = z.object({ password: z.string(), mustChange: bool.default(false) }).parse(req.body);
+  assertAdminSetPassword(password);
+  const st = await one('SELECT user_id FROM students WHERE id=$1', [sid]);
+  if (!st?.user_id) throw notFound();
+  const u = await one('UPDATE users SET password_hash=$2, must_change_password=$3, failed_attempts=0, locked_until=NULL WHERE id=$1 RETURNING username', [st.user_id, await hashPassword(password), mustChange]);
+  await pool.query(`DELETE FROM "session" WHERE sess->>'userId' = $1`, [String(st.user_id)]);
+  await audit(req, 'student.password_set', 'student', sid);
+  res.json({ username: u.username, password, mustChange });
 }));
 
 studentsRouter.post('/:id/reset-password', requirePerm('students.manage', 'users.manage'), ah(async (req, res) => {

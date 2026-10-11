@@ -22,3 +22,18 @@ export function tempPassword(): string {
   for (const b of bytes) out += alphabet[b % alphabet.length];
   return out.slice(0, 5) + '-' + out.slice(5) + (/\d/.test(out) ? '' : '7');
 }
+
+/** Passwords chosen by the Principal for staff/student accounts: any text of 6–128 characters. */
+export function assertAdminSetPassword(p: unknown): asserts p is string {
+  if (typeof p !== 'string' || p.length < 6 || p.length > 128) throw badRequest('Password must be at least 6 characters.');
+}
+
+/** Use the password chosen by the administrator, or generate a temporary one that must be changed. */
+export async function initialPassword(chosen?: string | null) {
+  if (chosen) {
+    assertAdminSetPassword(chosen);
+    return { password: chosen, hash: await hashPassword(chosen), mustChange: false };
+  }
+  const pw = tempPassword();
+  return { password: pw, hash: await hashPassword(pw), mustChange: true };
+}

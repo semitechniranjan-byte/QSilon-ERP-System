@@ -53,7 +53,8 @@ dashboardRouter.get('/admin', ah(async (req, res) => {
     can(req, 'audit.view') ? q(`SELECT a.action, a.entity_type, a.entity_id, a.at, u.display_name FROM audit_logs a LEFT JOIN users u ON u.id = a.actor_user_id
                                  WHERE a.action NOT IN ('auth.login') ORDER BY a.at DESC LIMIT 12`) : [],
   ]);
-  res.json({ year, today, counts, bySection, attendance, feeSummary, collectionTrend, newAdmissions, upcomingExams, pending, activity, notices: await feedFor(req, 6) });
+  const demo = await one(`SELECT EXISTS (SELECT 1 FROM students WHERE is_demo) AS on`);
+  res.json({ demoLoaded: demo.on, year, today, counts, bySection, attendance, feeSummary, collectionTrend, newAdmissions, upcomingExams, pending, activity, notices: await feedFor(req, 6) });
 }));
 
 dashboardRouter.get('/teacher', ah(async (req, res) => {

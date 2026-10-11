@@ -139,7 +139,7 @@ async function newInvoiceNo(c: Db, yearName: string) {
 }
 
 /** Idempotently generate the invoice for one enrollment and month. Safe to retry: existing charge keys are never re-billed. */
-export async function generateForEnrollment(enrollmentId: number, ym: string, userId: number): Promise<{ invoiceId: number | null; added: number }> {
+export async function generateForEnrollment(enrollmentId: number, ym: string, userId: number | null): Promise<{ invoiceId: number | null; added: number }> {
   return tx(async (c) => {
     await c.query('SELECT pg_advisory_xact_lock(1001, $1::int)', [enrollmentId]);
     const { lines } = await computeCharges(c, enrollmentId, ym);

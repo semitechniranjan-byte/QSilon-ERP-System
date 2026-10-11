@@ -8,12 +8,12 @@ import { useLookups } from '../../lib/lookups';
 import { fmtDate, fmtDateTime } from '../../lib/format';
 
 export default function Settings() {
-  const [tab, setTab] = useState<'school' | 'years' | 'boards' | 'grading' | 'messages'>('school');
+  const [tab, setTab] = useState<'school' | 'years' | 'boards' | 'grading' | 'messages' | 'demo'>(() => (new URLSearchParams(location.search).get('tab') === 'demo' ? 'demo' : 'school'));
   return (
     <>
       <PageHeader title="Settings" />
-      <Tabs value={tab} onChange={setTab} tabs={[{ key: 'school', label: 'School profile' }, { key: 'years', label: 'Academic years & terms' }, { key: 'boards', label: 'Boards & mediums' }, { key: 'grading', label: 'Grading & assessment' }, { key: 'messages', label: 'Messaging' }]} />
-      {tab === 'school' && <School />}{tab === 'years' && <Years />}{tab === 'boards' && <Boards />}{tab === 'grading' && <Grading />}{tab === 'messages' && <Messages />}
+      <Tabs value={tab} onChange={setTab} tabs={[{ key: 'school', label: 'School profile' }, { key: 'years', label: 'Academic years & terms' }, { key: 'boards', label: 'Boards & mediums' }, { key: 'grading', label: 'Grading & assessment' }, { key: 'messages', label: 'Messaging' }, { key: 'demo', label: 'Sample data' }]} />
+      {tab === 'school' && <School />}{tab === 'years' && <Years />}{tab === 'boards' && <Boards />}{tab === 'grading' && <Grading />}{tab === 'messages' && <Messages />}{tab === 'demo' && <DemoData />}
     </>
   );
 }
@@ -39,7 +39,7 @@ function School() {
         <div className="grid gap-3 md:grid-cols-2">
           {inp('name', 'School name')}{inp('nameHi', 'School name (Hindi)')}{inp('tagline', 'Tagline')}{inp('taglineHi', 'Tagline (Hindi)')}
           {inp('address', 'Address', { wide: true })}{inp('city', 'City')}{inp('state', 'State')}{inp('pincode', 'PIN code')}{inp('phone', 'Phone')}{inp('email', 'Email')}{inp('website', 'Website')}
-          {inp('mapUrl', 'Map link (Google Maps URL)')}{inp('establishedYear', 'Established year', { type: 'number' })}{inp('principalName', 'Principal name')}
+          {inp('mapUrl', 'Map link (Google Maps URL)')}{inp('schoolHours', 'School timings')}{inp('schoolHoursHi', 'School timings (Hindi)')}{inp('establishedYear', 'Established year', { type: 'number' })}{inp('principalName', 'Principal name')}
           <div className="flex flex-wrap items-center gap-4 md:col-span-2">
             <div className="flex items-center gap-2">{v.logoFileId && <img src={`/api/files/${v.logoFileId}`} alt="Logo" className="h-12 w-12 rounded object-contain" />}<FileInput purpose="logo" accept="image/png,image/jpeg,image/webp" label={v.logoFileId ? 'Replace logo' : 'Upload logo'} onUploaded={(f) => setV({ ...v, logoFileId: f.id })} /></div>
             <div className="flex items-center gap-2">{v.heroImageFileId && <img src={`/api/files/${v.heroImageFileId}`} alt="Hero" className="h-12 w-20 rounded object-cover" />}<FileInput purpose="hero" accept="image/png,image/jpeg,image/webp" label={v.heroImageFileId ? 'Replace homepage image' : 'Upload homepage image'} onUploaded={(f) => setV({ ...v, heroImageFileId: f.id })} /></div>
@@ -192,6 +192,47 @@ function Messages() {
           <p className="mt-3 text-sm text-slate-600">SMS, WhatsApp and email need credentials from a provider (set as environment variables on the server — see README → Messaging). Until then, messages are recorded with status "not configured" and are <b>not</b> sent.</p>
         </Card>
         <Card title="Message log" bodyClass="p-0"><DataTable rows={d.messages} columns={[{ key: 'created_at', header: 'Date', render: (r) => fmtDateTime(r.created_at) }, { key: 'channel', header: 'Channel' }, { key: 'recipient', header: 'To' }, { key: 'body', header: 'Message', render: (r) => <span className="text-xs">{r.body}</span> }, { key: 'status', header: 'Status', render: (r) => <StatusBadge status={r.status} /> }]} /></Card>
+      </div>
+    )}</Async>
+  );
+}
+
+function DemoData() {
+  const q = useApi<any>('/api/settings/demo');
+  const { confirm } = useUi();
+  const { run, busy } = useAction();
+  const [pw, setPw] = useState('');
+  const [result, setResult] = useState<any>(null);
+  return (
+    <Async q={q}>{(st) => (
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card title="Sample data for demonstrations">
+          <p className="text-sm text-slate-600">Loads a complete example school so you can show the system to others: 9 teachers, about 70 students from Playgroup to Class 12, timetable,
+            a month of attendance, fee invoices and payments, published Unit Test results, preschool progress cards, homework, quizzes, notices and events.</p>
+          <p className="mt-2 text-sm text-slate-600">Every sample record is tagged, so <b>Remove sample data</b> deletes only these records — your real students, teachers and payments are never touched.</p>
+          {st.loaded ? (
+            <div className="mt-4 space-y-3">
+              <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">Sample data is loaded ({st.teachers} teachers, {st.students} students). Remove it before entering real school data.</p>
+              <button className="btn-danger" disabled={busy} onClick={async () => { if (await confirm({ title: 'Remove sample data', message: 'Delete all sample teachers, students, fees, attendance, exams and notices? Real records are kept.', danger: true })) { await run(() => api.del('/api/settings/demo'), { success: 'Sample data removed.' }); setResult(null); } }}>Remove sample data</button>
+            </div>
+          ) : (
+            <div className="mt-4 space-y-3">
+              <Field label="Password for all sample accounts" hint="Teachers and students in the sample data will sign in with their ID and this password (min 6 characters)."><input className="input" type="text" value={pw} onChange={(e) => setPw(e.target.value)} /></Field>
+              <button className="btn-primary" disabled={busy || pw.length < 6} onClick={async () => { const r = await run(() => api.post('/api/settings/demo', { password: pw }), { success: 'Sample data loaded.' }); if (r) setResult(r); }}>{busy ? 'Loading… (up to a minute)' : 'Load sample data'}</button>
+            </div>
+          )}
+        </Card>
+        {result && (
+          <Card title="Sample logins" actions={<button className="btn-secondary btn-sm" onClick={() => window.print()}>Print</button>}>
+            <div className="print-area text-sm">
+              <p className="mb-2">Password for every account below: <b className="font-mono">{result.password}</b> · Sign in at {location.origin}/login</p>
+              <h3 className="mt-3 font-semibold">Teachers</h3>
+              <ul className="divide-y">{result.teachers.map((t: any) => <li key={t.username} className="flex justify-between py-1"><span>{t.name}</span><span className="font-mono">{t.username}</span></li>)}</ul>
+              <h3 className="mt-3 font-semibold">Students (two per class)</h3>
+              <ul className="divide-y">{result.students.map((s: any) => <li key={s.username} className="flex justify-between py-1"><span>{s.className} · {s.name}</span><span className="font-mono">{s.username}</span></li>)}</ul>
+            </div>
+          </Card>
+        )}
       </div>
     )}</Async>
   );

@@ -7,7 +7,7 @@ import { audit } from '../lib/audit.js';
 import { crud } from '../lib/crud.js';
 import { bool, date, email, id, optDate, optStr, str } from '../lib/validate.js';
 import { GRANTABLE, PERMISSIONS } from '../lib/permissions.js';
-import { hashPassword, tempPassword } from '../lib/passwords.js';
+import { assertAdminSetPassword, hashPassword, tempPassword } from '../lib/passwords.js';
 import { settings } from '../lib/context.js';
 
 export const settingsRouter = Router();
@@ -30,7 +30,7 @@ const schoolSchema = z.object({
   publicTeachersCount: z.preprocess((v) => (v === '' || v == null ? null : v), z.coerce.number().int().min(0).nullable()),
   publicClassesCount: z.preprocess((v) => (v === '' || v == null ? null : v), z.coerce.number().int().min(0).nullable()),
   publicYearsExperience: z.preprocess((v) => (v === '' || v == null ? null : v), z.coerce.number().int().min(0).nullable()),
-  enquiryEnabled: bool,
+  enquiryEnabled: bool, schoolHours: optStr(120), schoolHoursHi: optStr(120),
 });
 const snake = (s: string) => s.replace(/[A-Z]/g, (m) => '_' + m.toLowerCase());
 
@@ -205,6 +205,18 @@ settingsRouter.post('/users/:id/reset-password', requirePerm('users.manage'), ah
   await audit(req, 'user.password_reset', 'user', uid);
   res.json({ username: r.username, temporaryPassword: pw });
 }));
+settingsRouter.post('/users/:id/set-password', requirePerm('users.manage'), ah(async (req, res) => {
+  const uid = id.parse(req.params.id);
+  const { password, mustChange } = z.object({ password: z.string(), mustChange: bool.default(false) }).parse(req.body);
+  assertAdminSetPassword(password);
+  const r = await one(`UPDATE users SET password_hash=$2, must_change_password=$3, failed_attempts=0, locked_until=NULL, updated_at=now() WHERE id=$1 RETURNING username`,
+    [uid, await hashPassword(password), mustChange]);
+  if (!r) throw notFound();
+  if (uid !== req.user!.id) await pool.query(`DELETE FROM "session" WHERE sess->>'userId' = $1`, [String(uid)]);
+  await audit(req, 'user.password_set', 'user', uid);
+  res.json({ username: r.username, password, mustChange });
+}));
+
 settingsRouter.put('/users/:id/permissions', requirePerm('users.manage'), ah(async (req, res) => {
   const uid = id.parse(req.params.id);
   const { permissions } = z.object({ permissions: z.array(z.enum(GRANTABLE as [string, ...string[]])) }).parse(req.body);
@@ -226,6 +238,30 @@ settingsRouter.post('/reset-requests/:id/reject', requirePerm('users.manage'), a
   await pool.query(`UPDATE password_reset_requests SET status='rejected', resolved_by=$2, resolved_at=now() WHERE id=$1`, [id.parse(req.params.id), req.user!.id]);
   res.json({ ok: true });
 }));
+// ---------- Sample (demo) data ----------
+settingsRouter.get('/demo', requirePerm('settings.manage'), ah(async (_req, res) => {
+  const { demoStatus } = await import('../seed/demo.js');
+  res.json(await demoStatus());
+}));
+settingsRouter.post('/demo', requirePerm('settings.manage'), ah(async (req, res) => {
+  const { password } = z.object({ password: z.string().min(6, 'Password must be at least 6 characters.').max(128) }).parse(req.body);
+  const { seedDemo } = await import('../seed/demo.js');
+  try {
+    const r = await seedDemo({ password, actorUserId: req.user!.id, log: () => {} });
+    await audit(req, 'demo.load', 'demo', null, r.summary);
+    res.json(r);
+  } catch (e) {
+    if ((e as Error).message?.startsWith('Sample data is already loaded')) throw badRequest((e as Error).message);
+    throw e;
+  }
+}));
+settingsRouter.delete('/demo', requirePerm('settings.manage'), ah(async (req, res) => {
+  const { removeDemo } = await import('../seed/demo.js');
+  await removeDemo(() => {});
+  await audit(req, 'demo.remove', 'demo', null);
+  res.json({ ok: true });
+}));
+
 // ---------- Audit & communication logs ----------
 settingsRouter.get('/audit', requirePerm('audit.view'), ah(async (req, res) => {
   const f = z.object({ entityType: optStr(60).optional(), entityId: optStr(60).optional(), action: optStr(60).optional(), from: optDate.optional(), to: optDate.optional(),

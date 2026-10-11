@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Async, Badge, Card, Field, FileInput, Modal, PageHeader, StatusBadge, useAction, useApi, useUi } from '../../components/ui';
-import { CredentialsModal } from '../../components/Credentials';
+import { CredentialsModal, SetPasswordModal } from '../../components/Credentials';
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { useI18n } from '../../lib/i18n';
@@ -21,6 +21,7 @@ export default function StudentProfile() {
   const [plansFor, setPlansFor] = useState<any>(null);
   const [withdraw, setWithdraw] = useState(false);
   const [readmit, setReadmit] = useState(false);
+  const [setPw, setSetPw] = useState(false);
   const manage = can('students.manage');
   const base = user?.role === 'teacher' ? '/teacher' : '/admin';
   return (
@@ -34,12 +35,13 @@ export default function StudentProfile() {
             actions={manage && <>
               <Link to={`/admin/students/${id}/edit`} className="btn-secondary">{t('Edit')}</Link>
               {can('fees.view') && <Link to={`/admin/fees/student/${id}`} className="btn-secondary">{t('Fee statement')}</Link>}
+              <button className="btn-secondary" onClick={() => setSetPw(true)}>Set password</button>
               <button className="btn-secondary" onClick={async () => {
                 if (await confirm({ title: 'Reset password', message: 'Issue a new temporary password? The student will be signed out.' })) {
                   const r = await run(() => api.post(`/api/students/${id}/reset-password`), { success: false });
                   if (r) setCreds({ ...r, name: fullName(s) });
                 }
-              }}>Reset password</button>
+              }}>Temporary password</button>
               {s.status === 'active' ? <button className="btn-danger" onClick={() => setWithdraw(true)}>Withdraw / Transfer</button> : <button className="btn-primary" onClick={() => setReadmit(true)}>Re-admit</button>}
             </>} />
           <div className="grid gap-4 lg:grid-cols-3">
@@ -102,6 +104,7 @@ export default function StudentProfile() {
           {plansFor && <PlansModal studentId={s.id} e={plansFor} onClose={() => setPlansFor(null)} />}
           {withdraw && <WithdrawModal studentId={s.id} onClose={() => setWithdraw(false)} />}
           {readmit && <ReadmitModal studentId={s.id} onClose={() => setReadmit(false)} />}
+          {setPw && <SetPasswordModal url={`/api/students/${id}/set-password`} name={fullName(s)} onClose={() => setSetPw(false)} onDone={(c) => { setSetPw(false); setCreds(c); }} />}
           <CredentialsModal creds={creds} onClose={() => setCreds(null)} />
         </>
       );

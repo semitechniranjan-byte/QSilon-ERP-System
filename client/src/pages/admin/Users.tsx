@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { Async, Badge, Card, Field, Modal, PageHeader, Tabs, useAction, useApi, useUi } from '../../components/ui';
 import { DataTable } from '../../components/DataTable';
-import { CredentialsModal } from '../../components/Credentials';
+import { CredentialsModal, SetPasswordModal } from '../../components/Credentials';
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { fmtDateTime } from '../../lib/format';
@@ -27,6 +27,7 @@ function UserList() {
   const [creds, setCreds] = useState<any>(null);
   const [create, setCreate] = useState<any>(null);
   const [perm, setPerm] = useState<any>(null);
+  const [pwFor, setPwFor] = useState<any>(null);
   const { confirm } = useUi();
   const { run, busy, fieldErrors } = useAction();
   return (
@@ -43,7 +44,8 @@ function UserList() {
               { key: 'last_login_at', header: 'Last sign-in', render: (r) => fmtDateTime(r.last_login_at), sortValue: (r) => r.last_login_at },
               { key: 'state', header: 'State', render: (r) => <span className="flex flex-wrap gap-1">{r.is_active ? <Badge tone="green">active</Badge> : <Badge tone="red">inactive</Badge>}{r.must_change_password && <Badge tone="amber">temp password</Badge>}{r.locked_until && new Date(r.locked_until) > new Date() && <Badge tone="red">locked</Badge>}</span> },
               { key: 'a', header: '', sortable: false, render: (r) => <span className="flex gap-3 whitespace-nowrap">
-                <button className="link" onClick={async () => { if (await confirm({ title: 'Reset password', message: `Issue a temporary password for ${r.username}?` })) { const x = await run(() => api.post(`/api/settings/users/${r.id}/reset-password`), { success: false }); if (x) setCreds({ ...x, name: r.display_name }); } }}>Reset</button>
+                <button className="link" onClick={() => setPwFor(r)}>Set password</button>
+                <button className="link" onClick={async () => { if (await confirm({ title: 'Temporary password', message: `Issue a temporary password for ${r.username}?` })) { const x = await run(() => api.post(`/api/settings/users/${r.id}/reset-password`), { success: false }); if (x) setCreds({ ...x, name: r.display_name }); } }}>Temp</button>
                 {r.role !== 'student' && r.role !== 'admin' && <button className="link" onClick={() => setPerm({ user: r, perms: r.extra_permissions })}>Permissions</button>}
                 {r.id !== user?.id && <button className="link" onClick={async () => { if (await confirm({ title: r.is_active ? 'Deactivate' : 'Activate', message: r.username, danger: r.is_active })) run(() => api.post(`/api/settings/users/${r.id}/active`, { active: !r.is_active })); }}>{r.is_active ? 'Deactivate' : 'Activate'}</button>}</span> },
             ]} />
@@ -66,6 +68,7 @@ function UserList() {
           </div>
         </Modal>
       )}
+      {pwFor && <SetPasswordModal url={`/api/settings/users/${pwFor.id}/set-password`} name={pwFor.display_name} onClose={() => setPwFor(null)} onDone={(c) => { setPwFor(null); setCreds(c); }} />}
       <CredentialsModal creds={creds} onClose={() => setCreds(null)} />
     </Card>
   );

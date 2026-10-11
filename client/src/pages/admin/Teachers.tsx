@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { Async, Card, Field, Modal, PageHeader, StatusBadge, Tabs, useAction, useApi } from '../../components/ui';
 import { DataTable } from '../../components/DataTable';
-import { CredentialsModal } from '../../components/Credentials';
+import { CredentialsModal, PasswordField } from '../../components/Credentials';
 import { api } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
 import { fullName, todayISO } from '../../lib/format';
@@ -38,6 +38,7 @@ export default function Teachers() {
   const [open, setOpen] = useState(false);
   const [f, setF] = useState({ ...emptyTeacher });
   const [creds, setCreds] = useState<any>(null);
+  const [pw, setPw] = useState('');
   const { run, busy, fieldErrors } = useAction();
   return (
     <>
@@ -62,11 +63,12 @@ export default function Teachers() {
       ) : <StaffAttendance />}
       <Modal open={open} onClose={() => setOpen(false)} title="New teacher" size="lg" footer={<><button className="btn-secondary" onClick={() => setOpen(false)}>{t('Cancel')}</button>
         <button className="btn-primary" disabled={busy} onClick={async () => {
-          const r = await run(() => api.post('/api/teachers', f), { success: 'Teacher created.' });
-          if (r) { setOpen(false); setCreds({ username: r.username, temporaryPassword: r.temporaryPassword, name: fullName(r.teacher), id: r.teacher.id }); }
+          const r = await run(() => api.post('/api/teachers', { ...f, password: pw || null }), { success: 'Teacher created.' });
+          if (r) { setOpen(false); setPw(''); setCreds({ ...r, name: fullName(r.teacher), id: r.teacher.id }); }
         }}>{t('Create')}</button></>}>
         <TeacherFields f={f} set={(k, v) => setF({ ...f, [k]: v })} errors={fieldErrors} />
-        <p className="mt-3 text-xs text-slate-500">A unique Teacher ID and login are generated automatically. Assign subjects and classes from the teacher's page.</p>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2"><PasswordField value={pw} onChange={setPw} error={fieldErrors.password} /></div>
+        <p className="mt-3 text-xs text-slate-500">A unique Teacher ID (login ID) is generated automatically. Assign subjects and classes from the teacher's page.</p>
       </Modal>
       <CredentialsModal creds={creds} onClose={() => { const id = creds?.id; setCreds(null); if (id) nav(`/admin/teachers/${id}`); }} />
     </>

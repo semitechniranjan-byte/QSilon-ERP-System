@@ -47,20 +47,31 @@ describe('account protection', () => {
 
 describe('demo data', () => {
   it('can be seeded and removed without touching real records', async () => {
-    const { seedDemo, removeDemo } = await import('../server/seed/demo.js');
+    const { removeDemo } = await import('../server/seed/demo.js');
     const admin = await new Client(app).login('principal', 'Principal123');
-    await seedDemo();
+    const seeded = ok(await admin.post('/api/settings/demo', { password: 'demo1234' }));
+    expect(seeded.summary.students).toBeGreaterThan(50);
+    expect(seeded.summary.payments).toBeGreaterThan(0);
+    expect(ok(await admin.get('/api/dashboard/admin')).demoLoaded).toBe(true);
+    // Sample accounts use the chosen password; results and fees are visible in the portals.
+    const stu = await new Client(app).login(seeded.students.find((s: any) => s.className === '5A').username, 'demo1234');
+    expect(ok(await stu.get('/api/me/results')).length).toBeGreaterThan(0);
+    expect(ok(await stu.get('/api/me/fees')).payments.length).toBeGreaterThanOrEqual(0);
+    const tch = await new Client(app).login(seeded.teachers[0].username, 'demo1234');
+    expect(ok(await tch.get('/api/dashboard/teacher')).assignments.length).toBeGreaterThan(0);
+    expect((await admin.post('/api/settings/demo', { password: 'demo1234' })).status).toBe(400);
     const y = (await pool.query('SELECT id FROM academic_years WHERE is_current')).rows[0];
     const sec = (await pool.query(`SELECT id FROM sections WHERE academic_year_id = $1 LIMIT 1`, [y.id])).rows[0];
     // A real student admitted into a demo-created section keeps that section alive.
     const real = ok(await admin.post('/api/students', { firstName: 'Real', lastName: 'Child', dob: '2016-01-01', guardians: [{ name: 'Parent', relation: 'Mother', phone: '9000011111' }],
       enrollment: { sectionId: sec.id, residency: 'day_scholar', transportOpted: false } }), 201);
     ok(await admin.post('/api/fees/invoices/generate', { fromMonth: new Date().toISOString().slice(0, 7), toMonth: new Date().toISOString().slice(0, 7) }));
-    await removeDemo();
+    await removeDemo(() => {});
     const left = (await pool.query('SELECT count(*)::int AS n FROM students WHERE is_demo')).rows[0].n;
     expect(left).toBe(0);
     expect((await pool.query('SELECT count(*)::int AS n FROM users WHERE is_demo')).rows[0].n).toBe(0);
     expect((await pool.query('SELECT id FROM students WHERE id = $1', [real.student.id])).rows).toHaveLength(1);
     expect((await pool.query('SELECT id FROM sections WHERE id = $1', [sec.id])).rows).toHaveLength(1);
-  });
+    expect((await pool.query(`SELECT count(*)::int AS n FROM exams`)).rows[0].n).toBe(0);
+  }, 180000);
 });

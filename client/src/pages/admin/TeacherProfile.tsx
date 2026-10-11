@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Trash2 } from 'lucide-react';
 import { Async, Card, Field, Modal, PageHeader, StatusBadge, useAction, useApi, useUi } from '../../components/ui';
-import { CredentialsModal } from '../../components/Credentials';
+import { CredentialsModal, SetPasswordModal } from '../../components/Credentials';
 import { TeacherFields } from './Teachers';
 import { api } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
@@ -18,6 +18,7 @@ export default function TeacherProfile() {
   const [edit, setEdit] = useState<any>(null);
   const [assign, setAssign] = useState(false);
   const [creds, setCreds] = useState<any>(null);
+  const [setPw, setSetPw] = useState(false);
   return (
     <Async q={q}>{(tch) => (
       <>
@@ -25,7 +26,8 @@ export default function TeacherProfile() {
           actions={<>
             <button className="btn-secondary" onClick={() => setEdit({ firstName: tch.first_name, lastName: tch.last_name ?? '', gender: tch.gender ?? '', dob: tch.dob ?? '', phone: tch.phone ?? '', email: tch.email ?? '', address: tch.address ?? '',
               qualification: tch.qualification ?? '', experienceYears: tch.experience_years ?? '', designation: tch.designation ?? '', joiningDate: tch.joining_date ?? '', photoFileId: tch.photo_file_id })}>{t('Edit')}</button>
-            <button className="btn-secondary" onClick={async () => { if (await confirm({ title: 'Reset password', message: 'Issue a new temporary password? The teacher will be signed out.' })) { const r = await run(() => api.post(`/api/teachers/${id}/reset-password`), { success: false }); if (r) setCreds({ ...r, name: fullName(tch) }); } }}>Reset password</button>
+            <button className="btn-secondary" onClick={() => setSetPw(true)}>Set password</button>
+            <button className="btn-secondary" onClick={async () => { if (await confirm({ title: 'Reset password', message: 'Issue a new temporary password? The teacher will be signed out.' })) { const r = await run(() => api.post(`/api/teachers/${id}/reset-password`), { success: false }); if (r) setCreds({ ...r, name: fullName(tch) }); } }}>Temporary password</button>
             {tch.status === 'active'
               ? <button className="btn-danger" onClick={async () => { if (await confirm({ title: 'Deactivate teacher', message: 'The teacher will be signed out and unable to log in. Records are preserved.', danger: true })) run(() => api.post(`/api/teachers/${id}/status`, { status: 'inactive' })); }}>Deactivate</button>
               : <button className="btn-primary" onClick={() => run(() => api.post(`/api/teachers/${id}/status`, { status: 'active' }))}>Activate</button>}
@@ -58,6 +60,7 @@ export default function TeacherProfile() {
           </Modal>
         )}
         {assign && <AssignModal teacherId={Number(id)} onClose={() => setAssign(false)} />}
+        {setPw && <SetPasswordModal url={`/api/teachers/${id}/set-password`} name={fullName(tch)} onClose={() => setSetPw(false)} onDone={(c) => { setSetPw(false); setCreds(c); }} />}
         <CredentialsModal creds={creds} onClose={() => setCreds(null)} />
       </>
     )}</Async>

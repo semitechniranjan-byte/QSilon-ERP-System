@@ -5,7 +5,7 @@ import { ah, notFound } from '../lib/errors.js';
 import { requirePerm } from '../middleware/auth.js';
 import { audit } from '../lib/audit.js';
 import { bool, date, email, id, optDate, optStr, phone, str } from '../lib/validate.js';
-import { hashPassword, tempPassword } from '../lib/passwords.js';
+import { assertAdminSetPassword, hashPassword, initialPassword, tempPassword } from '../lib/passwords.js';
 import { nextCounter, pad } from '../lib/counters.js';
 import { settings } from '../lib/context.js';
 import { todayIST } from '../lib/dates.js';
@@ -87,16 +87,15 @@ teachersRouter.get('/:id', requirePerm('teachers.manage'), ah(async (req, res) =
 }));
 
 teachersRouter.post('/', requirePerm('teachers.manage'), ah(async (req, res) => {
-  const b = teacherSchema.extend({ isDemo: bool.optional() }).parse(req.body);
+  const b = teacherSchema.extend({ isDemo: bool.optional(), password: optStr(128).optional() }).parse(req.body);
   const s = await settings();
-  const pw = tempPassword();
-  const hash = await hashPassword(pw);
+  const cred = await initialPassword(b.password);
   const out = await tx(async (c) => {
     const n = await nextCounter(c, 'teacher_code');
     const code = `${s.teacher_id_prefix}${pad(n, 4)}`;
     const name = [b.firstName, b.lastName].filter(Boolean).join(' ');
-    const u = await one(`INSERT INTO users (username, password_hash, role, display_name, email, is_demo) VALUES ($1,$2,'teacher',$3,$4,$5) RETURNING id`,
-      [code, hash, name, b.email, !!b.isDemo], c);
+    const u = await one(`INSERT INTO users (username, password_hash, role, display_name, email, is_demo, must_change_password) VALUES ($1,$2,'teacher',$3,$4,$5,$6) RETURNING id`,
+      [code, cred.hash, name, b.email, !!b.isDemo, cred.mustChange], c);
     const t = await one(
       `INSERT INTO teachers (user_id, employee_code, first_name, last_name, gender, dob, phone, email, address, qualification, experience_years, designation, joining_date, photo_file_id, is_demo)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
@@ -104,7 +103,7 @@ teachersRouter.post('/', requirePerm('teachers.manage'), ah(async (req, res) => 
     await audit(req, 'teacher.create', 'teacher', t.id, { employeeCode: code }, c);
     return t;
   });
-  res.status(201).json({ teacher: out, username: out.employee_code, temporaryPassword: pw });
+  res.status(201).json({ teacher: out, username: out.employee_code, password: cred.password, mustChange: cred.mustChange, temporaryPassword: cred.mustChange ? cred.password : undefined });
 }));
 
 teachersRouter.put('/:id', requirePerm('teachers.manage'), ah(async (req, res) => {
@@ -129,6 +128,18 @@ teachersRouter.post('/:id/status', requirePerm('teachers.manage'), ah(async (req
   if (status !== 'active') await pool.query(`DELETE FROM "session" WHERE sess->>'userId' = $1`, [String(t.user_id)]);
   await audit(req, 'teacher.status', 'teacher', tid, { status });
   res.json({ ok: true });
+}));
+
+teachersRouter.post('/:id/set-password', requirePerm('teachers.manage'), ah(async (req, res) => {
+  const tid = id.parse(req.params.id);
+  const { password, mustChange } = z.object({ password: z.string(), mustChange: bool.default(false) }).parse(req.body);
+  assertAdminSetPassword(password);
+  const t = await one('SELECT user_id FROM teachers WHERE id=$1', [tid]);
+  if (!t) throw notFound();
+  const u = await one('UPDATE users SET password_hash=$2, must_change_password=$3, failed_attempts=0, locked_until=NULL WHERE id=$1 RETURNING username', [t.user_id, await hashPassword(password), mustChange]);
+  await pool.query(`DELETE FROM "session" WHERE sess->>'userId' = $1`, [String(t.user_id)]);
+  await audit(req, 'teacher.password_set', 'teacher', tid);
+  res.json({ username: u.username, password, mustChange });
 }));
 
 teachersRouter.post('/:id/reset-password', requirePerm('teachers.manage'), ah(async (req, res) => {

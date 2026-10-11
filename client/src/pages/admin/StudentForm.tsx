@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Plus, Trash2 } from 'lucide-react';
 import { api, ApiError } from '../../lib/api';
 import { Card, Field, FileInput, Loading, Modal, PageHeader, useAction, useApi, useUi } from '../../components/ui';
-import { CredentialsModal } from '../../components/Credentials';
+import { CredentialsModal, PasswordField } from '../../components/Credentials';
 import { useI18n } from '../../lib/i18n';
 import { useLookups } from '../../lib/lookups';
 import { fullName, inr, todayISO } from '../../lib/format';
@@ -29,6 +29,7 @@ export default function StudentForm() {
   const [docs, setDocs] = useState<{ fileId: string; docType: string; name: string }[]>([]);
   const [dupes, setDupes] = useState<any[] | null>(null);
   const [creds, setCreds] = useState<any>(null);
+  const [loginPw, setLoginPw] = useState('');
   const { run, busy, fieldErrors } = useAction();
   const [err, setErr] = useState<Record<string, string[]>>({});
 
@@ -71,11 +72,11 @@ export default function StudentForm() {
     if (!pickedType('preschool') && !pickedType('school')) toast('error', 'No base fee plan selected — no tuition will be billed until one is assigned.');
     Object.assign(body, {
       enrollment: { sectionId: Number(enr.sectionId), rollNo: enr.rollNo || null, residency: enr.residency, transportOpted: enr.transportOpted, transportRouteId: enr.transportOpted ? Number(enr.transportRouteId) || null : null },
-      feePlanIds: planIds, documents: docs.map(({ fileId, docType }) => ({ fileId, docType })), confirmDuplicate,
+      feePlanIds: planIds, documents: docs.map(({ fileId, docType }) => ({ fileId, docType })), confirmDuplicate, password: loginPw || null,
     });
     try {
       const r = await api.post('/api/students', body);
-      setCreds({ username: r.username, temporaryPassword: r.temporaryPassword, name: fullName({ first_name: f.firstName, last_name: f.lastName }), studentId: r.student.id });
+      setCreds({ ...r, name: fullName({ first_name: f.firstName, last_name: f.lastName }), studentId: r.student.id });
     } catch (e) {
       if (e instanceof ApiError && e.details?.code === 'POSSIBLE_DUPLICATE') return setDupes(e.details.matches);
       if (e instanceof ApiError && e.fields) setErr(e.fields);
@@ -179,6 +180,10 @@ export default function StudentForm() {
                   {enr.transportOpted && <p className="text-xs text-slate-500">Transport is billed monthly from the selected route.</p>}
                 </div>
               )}
+            </Card>
+            <Card title="Student login">
+              <div className="grid gap-4 md:grid-cols-2"><PasswordField value={loginPw} onChange={setLoginPw} error={errors.password} />
+                <p className="text-sm text-slate-500 md:pt-7">The Student ID is generated automatically and is the login ID. Admission number can also be used to sign in.</p></div>
             </Card>
             <Card title="Documents">
               <div className="space-y-2">

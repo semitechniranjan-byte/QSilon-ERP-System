@@ -19,5 +19,9 @@ services:
         sync: false # paste your Render Postgres *Internal Database URL* in the dashboard
       - key: SESSION_SECRET
         generateValue: true
+      - key: ADMIN_USERNAME
+        sync: false # Principal login ID, e.g. principal
+      - key: ADMIN_PASSWORD
+        sync: false # Principal password (min 8 characters); used only to create the first account
       - key: SETUP_TOKEN
         sync: false

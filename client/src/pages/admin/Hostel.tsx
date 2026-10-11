@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { BedDouble, Download, Plus } from 'lucide-react';
-import { Async, Badge, Card, Field, Modal, PageHeader, Tabs, useAction, useApi, useUi } from '../../components/ui';
+import { Async, Badge, Card, DeleteButton, Field, Modal, PageHeader, Tabs, useAction, useApi, useUi } from '../../components/ui';
 import { DataTable } from '../../components/DataTable';
 import { api } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
@@ -65,6 +65,7 @@ function Rooms() {
       </div>
       {cur && (
         <Card title={<span>{cur.name} <Badge tone="purple">{cur.hostel_type.replace('_', '-')}</Badge></span>} actions={<>
+          <DeleteButton className="btn-ghost btn-sm text-red-600" url={`/api/hostel/${cur.id}`} what={`Hostel "${cur.name}"`} onDone={() => setHid(null)} />
           <button className="btn-secondary btn-sm" onClick={() => setEditH({ id: cur.id, name: cur.name, hostelType: cur.hostel_type, building: cur.building ?? '', wardenName: cur.warden_name ?? '', wardenPhone: cur.warden_phone ?? '', emergencyPhone: cur.emergency_phone ?? '', notes: cur.notes ?? '', isActive: cur.is_active })}>Edit hostel</button>
           <button className="btn-primary btn-sm" onClick={() => setEditR({ hostelId: cur.id, roomNo: '', floor: '', roomType: '', capacity: 2 })}><Plus className="h-4 w-4" />Room</button></>}>
           <p className="mb-4 text-sm text-slate-500">Warden: {cur.warden_name ?? '—'} {cur.warden_phone ? `· ${cur.warden_phone}` : ''} · Emergency: {cur.emergency_phone ?? '—'}</p>
@@ -74,7 +75,7 @@ function Rooms() {
               return (
                 <div key={r.id} className={`rounded-xl border p-3 ${!r.is_active ? 'opacity-50' : ''}`}>
                   <div className="mb-2 flex items-center justify-between"><p className="font-semibold">Room {r.room_no} <span className="text-xs font-normal text-slate-500">{r.floor ? `Floor ${r.floor}` : ''} {r.room_type ?? ''}</span></p>
-                    <button className="link text-xs" onClick={() => setEditR({ id: r.id, roomNo: r.room_no, floor: r.floor ?? '', roomType: r.room_type ?? '', capacity: r.capacity, isActive: r.is_active })}>Edit</button></div>
+                    <span className="flex gap-2"><button className="link text-xs" onClick={() => setEditR({ id: r.id, roomNo: r.room_no, floor: r.floor ?? '', roomType: r.room_type ?? '', capacity: r.capacity, isActive: r.is_active })}>Edit</button><DeleteButton className="link text-xs text-red-600" url={`/api/hostel/rooms/${r.id}`} what={`Room ${r.room_no}`} /></span></div>
                   <p className="mb-2 text-xs text-slate-500">{occ} / {r.capacity} occupied</p>
                   <ul className="space-y-1">{r.beds.filter((b: any) => b.is_active || b.allocation_id).map((b: any) => (
                     <li key={b.id} className={`flex items-center justify-between rounded-md px-2 py-1 text-sm ${b.allocation_id ? 'bg-violet-50' : 'bg-emerald-50'}`}>

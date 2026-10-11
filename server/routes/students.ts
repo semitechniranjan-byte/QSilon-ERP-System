@@ -9,7 +9,7 @@ import { assertAdminSetPassword, hashPassword, initialPassword, tempPassword } f
 import { nextCounter, pad } from '../lib/counters.js';
 import { resolveYear, settings } from '../lib/context.js';
 import { todayIST } from '../lib/dates.js';
-import { assignPlan, studentBalance } from '../services/fees.js';
+import { assignPlan, autoAssignPlans, billUpToNow, studentBalance } from '../services/fees.js';
 
 export const studentsRouter = Router();
 
@@ -175,13 +175,17 @@ studentsRouter.post('/', requirePerm('students.manage'), ah(async (req, res) => 
       [st.id, sec.academic_year_id, sec.id, sec.class_level_id, roll, b.enrollment.residency, b.enrollment.transportOpted,
         b.enrollment.transportOpted ? b.enrollment.transportRouteId : null, enrolledOn], c);
     for (const pid of b.feePlanIds) await assignPlan(c, e.id, pid, req.user!.id);
+    await autoAssignPlans(c, e.id, req.user!.id); // class fee plan (and hostel plan) when none was picked
     for (const d of b.documents ?? []) {
       await c.query('INSERT INTO student_documents (student_id, file_id, doc_type, uploaded_by) VALUES ($1,$2,$3,$4)', [st.id, d.fileId, d.docType, req.user!.id]);
     }
     await audit(req, 'student.admit', 'student', st.id, { studentCode, admissionNo, sectionId: sec.id, rollNo: roll }, c);
     return { student: st, enrollment: e };
   });
-  res.status(201).json({ ...out, username: out.student.student_code, password: cred.password, mustChange: cred.mustChange, temporaryPassword: cred.mustChange ? cred.password : undefined });
+  // Bill fees right away (admission fee, current month, etc.) so the fee card and receipts are ready.
+  const billed = await billUpToNow(out.enrollment.id, req.user!.id).catch(() => 0);
+  const balance = await studentBalance(out.student.id);
+  res.status(201).json({ ...out, billed, outstandingPaise: balance.outstanding, username: out.student.student_code, password: cred.password, mustChange: cred.mustChange, temporaryPassword: cred.mustChange ? cred.password : undefined });
 }));
 
 // ---------- Profile ----------
@@ -305,6 +309,8 @@ studentsRouter.post('/promote', requirePerm('students.manage'), ah(async (req, r
         `INSERT INTO enrollments (student_id, academic_year_id, section_id, class_level_id, roll_no, residency, transport_opted, transport_route_id, enrolled_on)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
         [e.student_id, b.toYearId, sec.id, sec.class_level_id, await nextRoll(c, sec.id), e.residency, e.transport_opted, e.transport_route_id, y.start_date]);
+      const ne = await one('SELECT id FROM enrollments WHERE student_id=$1 AND academic_year_id=$2', [e.student_id, b.toYearId], c);
+      await autoAssignPlans(c, ne.id, req.user!.id); // next year's class fee plan, if it has been set up
       promoted++;
     }
     await audit(req, 'student.promote', 'academic_year', b.toYearId, { promoted, completed, count: b.items.length }, c);
@@ -351,6 +357,7 @@ studentsRouter.post('/:id/readmit', requirePerm('students.manage'), ah(async (re
         [sid, sec.academic_year_id, sec.id, sec.class_level_id, roll, b.residency, b.transportOpted, b.transportOpted ? b.transportRouteId : null], c)).id;
     }
     for (const p of b.feePlanIds) await assignPlan(c, eid, p, req.user!.id);
+    await autoAssignPlans(c, eid, req.user!.id);
     await c.query(`UPDATE students SET status='active', status_changed_at=now(), status_reason='Re-admitted' WHERE id=$1`, [sid]);
     await c.query('UPDATE users SET is_active=true WHERE id=$1', [st.user_id]);
     await audit(req, 'student.readmit', 'student', sid, { sectionId: sec.id }, c);
@@ -379,6 +386,39 @@ studentsRouter.post('/:id/reset-password', requirePerm('students.manage', 'users
   await pool.query(`DELETE FROM "session" WHERE sess->>'userId' = $1`, [String(st.user_id)]);
   await audit(req, 'student.password_reset', 'student', sid);
   res.json({ username: u.username, temporaryPassword: pw });
+}));
+
+/** Delete a student added by mistake. Only allowed while the student has no payments, attendance, marks or hostel history. */
+studentsRouter.delete('/:id', requirePerm('students.manage'), ah(async (req, res) => {
+  const sid = id.parse(req.params.id);
+  await tx(async (c) => {
+    const st = await one('SELECT id, user_id, student_code, first_name, last_name FROM students WHERE id=$1 FOR UPDATE', [sid], c);
+    if (!st) throw notFound();
+    const used = await one(`SELECT (SELECT count(*) FROM payments WHERE student_id=$1) AS payments, (SELECT count(*) FROM attendance_records WHERE student_id=$1) AS attendance,
+                                   (SELECT count(*) FROM marks WHERE student_id=$1) + (SELECT count(*) FROM development_assessments WHERE student_id=$1) AS marks,
+                                   (SELECT count(*) FROM hostel_allocations WHERE student_id=$1) AS hostel,
+                                   (SELECT count(*) FROM assignment_submissions WHERE student_id=$1) + (SELECT count(*) FROM quiz_attempts WHERE student_id=$1) AS work`, [sid], c);
+    const reasons = Object.entries(used).filter(([, v]) => Number(v) > 0).map(([k]) => k);
+    if (reasons.length) throw badRequest(`This student already has ${reasons.join(', ')} records, so they cannot be deleted. Use Withdraw / Transfer instead (records are kept).`);
+    await c.query(`DELETE FROM fee_invoice_lines WHERE invoice_id IN (SELECT id FROM fee_invoices WHERE student_id=$1)`, [sid]);
+    await c.query(`DELETE FROM fee_invoices WHERE student_id=$1`, [sid]);
+    await c.query(`DELETE FROM concessions WHERE enrollment_id IN (SELECT id FROM enrollments WHERE student_id=$1)`, [sid]);
+    await c.query(`DELETE FROM student_fee_plans WHERE enrollment_id IN (SELECT id FROM enrollments WHERE student_id=$1)`, [sid]);
+    await c.query(`DELETE FROM enrollments WHERE student_id=$1`, [sid]);
+    await c.query(`DELETE FROM student_documents WHERE student_id=$1`, [sid]);
+    await c.query(`DELETE FROM profile_correction_requests WHERE student_id=$1`, [sid]);
+    await c.query(`DELETE FROM report_card_remarks WHERE student_id=$1`, [sid]);
+    const gs = (await c.query(`DELETE FROM student_guardians WHERE student_id=$1 RETURNING guardian_id`, [sid])).rows.map((r) => r.guardian_id);
+    await c.query(`DELETE FROM guardians WHERE id = ANY($1) AND user_id IS NULL AND NOT EXISTS (SELECT 1 FROM student_guardians sg WHERE sg.guardian_id = guardians.id)`, [gs]);
+    await c.query('DELETE FROM students WHERE id=$1', [sid]);
+    if (st.user_id) {
+      await c.query(`DELETE FROM "session" WHERE sess->>'userId' = $1`, [String(st.user_id)]);
+      await c.query('UPDATE audit_logs SET actor_user_id = NULL WHERE actor_user_id = $1', [st.user_id]);
+      await c.query('DELETE FROM users WHERE id=$1', [st.user_id]);
+    }
+    await audit(req, 'student.delete', 'student', sid, { studentCode: st.student_code, name: [st.first_name, st.last_name].filter(Boolean).join(' ') }, c);
+  });
+  res.json({ ok: true });
 }));
 
 studentsRouter.post('/:id/documents', requirePerm('students.manage'), ah(async (req, res) => {

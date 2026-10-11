@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { one, pool, q, tx } from '../db/pool.js';
-import { ah, notFound } from '../lib/errors.js';
+import { ah, badRequest, notFound } from '../lib/errors.js';
 import { requirePerm } from '../middleware/auth.js';
 import { audit } from '../lib/audit.js';
 import { bool, date, email, id, optDate, optStr, phone, str } from '../lib/validate.js';
@@ -117,6 +117,31 @@ teachersRouter.put('/:id', requirePerm('teachers.manage'), ah(async (req, res) =
   await pool.query('UPDATE users SET display_name=$2, email=$3 WHERE id=$1', [t.user_id, [b.firstName, b.lastName].filter(Boolean).join(' '), b.email]);
   await audit(req, 'teacher.update', 'teacher', tid, b);
   res.json(t);
+}));
+
+/** Delete a teacher added by mistake. Teachers with any recorded work are deactivated instead, to keep history. */
+teachersRouter.delete('/:id', requirePerm('teachers.manage'), ah(async (req, res) => {
+  const tid = id.parse(req.params.id);
+  await tx(async (c) => {
+    const t = await one('SELECT id, user_id, employee_code, first_name, last_name FROM teachers WHERE id=$1 FOR UPDATE', [tid], c);
+    if (!t) throw notFound();
+    const used = await one(`SELECT (SELECT count(*) FROM assignments WHERE teacher_id=$1) + (SELECT count(*) FROM quizzes WHERE teacher_id=$1)
+                                 + (SELECT count(*) FROM study_materials WHERE teacher_id=$1) + (SELECT count(*) FROM teacher_attendance WHERE teacher_id=$1)
+                                 + (SELECT count(*) FROM attendance_records WHERE marked_by=$2 OR updated_by=$2) + (SELECT count(*) FROM marks WHERE entered_by=$2) AS n`, [tid, t.user_id], c);
+    if (Number(used.n) > 0) throw badRequest('This teacher has already recorded attendance, marks or homework, so they cannot be deleted. Deactivate the teacher instead (history is kept).');
+    await c.query('DELETE FROM timetable_entries WHERE teacher_id=$1', [tid]);
+    await c.query('DELETE FROM teaching_assignments WHERE teacher_id=$1', [tid]);
+    await c.query('UPDATE sections SET class_teacher_id = NULL WHERE class_teacher_id=$1', [tid]);
+    await c.query('DELETE FROM teachers WHERE id=$1', [tid]);
+    if (t.user_id) {
+      await c.query(`DELETE FROM "session" WHERE sess->>'userId' = $1`, [String(t.user_id)]);
+      await c.query('DELETE FROM user_permissions WHERE user_id=$1', [t.user_id]);
+      await c.query('UPDATE audit_logs SET actor_user_id = NULL WHERE actor_user_id = $1', [t.user_id]);
+      await c.query('DELETE FROM users WHERE id=$1', [t.user_id]);
+    }
+    await audit(req, 'teacher.delete', 'teacher', tid, { employeeCode: t.employee_code, name: [t.first_name, t.last_name].filter(Boolean).join(' ') }, c);
+  });
+  res.json({ ok: true });
 }));
 
 teachersRouter.post('/:id/status', requirePerm('teachers.manage'), ah(async (req, res) => {

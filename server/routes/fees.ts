@@ -10,6 +10,7 @@ import { bool, date, id, optDate, optId, optStr, rupees, str } from '../lib/vali
 import { resolveYear, settings } from '../lib/context.js';
 import { addMonths, todayIST } from '../lib/dates.js';
 import {
+  autoAssignPlans, billUpToNow, HOSTEL_CATEGORIES, STRUCTURE_CATEGORIES,
   addManualCharge, cancelInvoice, computeCharges, generateInvoices, recordPayment, refundPayment, reversePayment, studentBalance, waiveLine,
 } from '../services/fees.js';
 import { renderReceiptPdf } from '../pdf/receipt.js';
@@ -20,7 +21,7 @@ const MODE = z.enum(['cash', 'bank_transfer', 'upi', 'card', 'cheque', 'other'])
 const ym = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Use YYYY-MM');
 
 // ---------- Categories ----------
-crud(feesRouter, { path: '/categories', table: 'fee_categories', perm: 'fees.manage', readPerm: 'fees.view', orderBy: 'id',
+crud(feesRouter, { path: '/categories', table: 'fee_categories', perm: 'fees.manage', readPerm: 'fees.view', orderBy: 'id', allowDelete: true,
   schema: z.object({ code: z.string().trim().regex(/^[A-Z0-9_]{2,20}$/), name: str(100), nameHi: optStr(100),
     kind: z.enum(['admission', 'tuition', 'preschool_course', 'annual', 'exam', 'hostel', 'transport', 'uniform', 'books', 'activity', 'other']),
     defaultFrequency: FREQ, isRefundable: bool.optional(), isActive: bool.optional() }) });
@@ -47,6 +48,15 @@ feesRouter.put('/routes/:id', requirePerm('transport.manage'), ah(async (req, re
   if (!r) throw notFound();
   await audit(req, 'transport_route.update', 'transport_route', r.id, b);
   res.json(r);
+}));
+feesRouter.delete('/routes/:id', requirePerm('transport.manage'), ah(async (req, res) => {
+  const rid = id.parse(req.params.id);
+  const used = await one('SELECT 1 FROM enrollments WHERE transport_route_id=$1 LIMIT 1', [rid]);
+  if (used) throw badRequest('Students use (or used) this route, so it cannot be deleted. Mark it inactive instead.');
+  const r = await one('DELETE FROM transport_routes WHERE id=$1 RETURNING name', [rid]);
+  if (!r) throw notFound();
+  await audit(req, 'transport_route.delete', 'transport_route', rid, r);
+  res.json({ ok: true });
 }));
 feesRouter.get('/routes/:id/riders', requirePerm('transport.manage', 'fees.view'), ah(async (req, res) => {
   res.json(await q(`SELECT st.id, st.first_name, st.last_name, st.student_code, cl.name AS class_name, sec.name AS section_name, e.roll_no
@@ -121,6 +131,15 @@ feesRouter.put('/plans/:id', requirePerm('fees.manage'), ah(async (req, res) => 
   });
   res.json({ ok: true, note: 'Changes apply to invoices generated from now on. Existing invoices are not altered.' });
 }));
+feesRouter.delete('/plans/:id', requirePerm('fees.manage'), ah(async (req, res) => {
+  const pid = id.parse(req.params.id);
+  const used = await one('SELECT count(*)::int AS n FROM student_fee_plans WHERE fee_plan_id=$1', [pid]);
+  if (used.n > 0) throw badRequest(`${used.n} student(s) are on this plan. Move them to another plan or mark this plan inactive instead.`);
+  const r = await one('DELETE FROM fee_plans WHERE id=$1 RETURNING name', [pid]);
+  if (!r) throw notFound();
+  await audit(req, 'fee_plan.delete', 'fee_plan', pid, r);
+  res.json({ ok: true });
+}));
 feesRouter.post('/plans/:id/assign', requirePerm('fees.manage'), ah(async (req, res) => {
   const pid = id.parse(req.params.id);
   const { enrollmentIds } = z.object({ enrollmentIds: z.array(id).min(1).max(600) }).parse(req.body);
@@ -130,6 +149,71 @@ feesRouter.post('/plans/:id/assign', requirePerm('fees.manage'), ah(async (req, 
     await audit(req, 'fee_plan.assign', 'fee_plan', pid, { count: enrollmentIds.length }, c);
   });
   res.json({ ok: true, assigned: enrollmentIds.length });
+}));
+
+// ---------- Class-wise fee structure (one grid for the whole school) ----------
+feesRouter.get('/structure', requirePerm('fees.view'), ah(async (req, res) => {
+  const y = await resolveYear(req.query.yearId);
+  const cats = await q(`SELECT id, code, name, name_hi, default_frequency FROM fee_categories WHERE code = ANY($1)`, [[...STRUCTURE_CATEGORIES, ...HOSTEL_CATEGORIES]]);
+  const classes = await q(`SELECT id, name, is_preschool FROM class_levels WHERE is_active ORDER BY sort_order`);
+  const plans = await q(
+    `SELECT p.id, p.class_level_id, p.plan_type, p.name,
+            (SELECT json_object_agg(fc.code, json_build_object('amount', i.amount_paise, 'frequency', i.frequency)) FROM fee_plan_items i JOIN fee_categories fc ON fc.id = i.fee_category_id WHERE i.fee_plan_id = p.id) AS items,
+            (SELECT count(*) FROM student_fee_plans sp WHERE sp.fee_plan_id = p.id) AS students
+       FROM fee_plans p WHERE p.academic_year_id = $1 AND p.is_active ORDER BY p.id`, [y.id]);
+  const rows = classes.map((cl) => {
+    const p = plans.find((x) => x.class_level_id === cl.id && x.plan_type === (cl.is_preschool ? 'preschool' : 'school'));
+    return { classLevelId: cl.id, className: cl.name, planId: p?.id ?? null, students: p?.students ?? 0, items: p?.items ?? {} };
+  });
+  const hostel = plans.find((x) => x.plan_type === 'hostel' && x.class_level_id == null) ?? null;
+  res.json({ year: y, categories: cats, rows, hostel: hostel ? { planId: hostel.id, items: hostel.items ?? {}, students: hostel.students } : null });
+}));
+feesRouter.put('/structure', requirePerm('fees.manage'), ah(async (req, res) => {
+  const amount = z.preprocess((v) => (v === '' || v == null ? null : v), rupees.nullable());
+  const b = z.object({
+    academicYearId: id,
+    rows: z.array(z.object({ classLevelId: id, amounts: z.record(z.string(), amount) })).max(30),
+    hostel: z.record(z.string(), amount).optional(),
+    applyToStudents: bool.default(true),
+  }).parse(req.body);
+  const y = await one('SELECT id, name FROM academic_years WHERE id = $1', [b.academicYearId]);
+  if (!y) throw badRequest('Unknown academic year.');
+  const cats = await q(`SELECT id, code, default_frequency FROM fee_categories WHERE code = ANY($1)`, [[...STRUCTURE_CATEGORIES, ...HOSTEL_CATEGORIES]]);
+  const catBy = Object.fromEntries(cats.map((c) => [c.code, c]));
+  const touched: number[] = [];
+  await tx(async (c) => {
+    const upsertPlan = async (name: string, type: string, classLevelId: number | null, amounts: Record<string, number | null>, allowed: readonly string[]) => {
+      let p = await one(`SELECT id FROM fee_plans WHERE academic_year_id = $1 AND plan_type = $2 AND class_level_id IS NOT DISTINCT FROM $3 AND is_active ORDER BY id LIMIT 1`, [y.id, type, classLevelId], c);
+      const items = allowed.filter((k) => catBy[k] && amounts[k] != null && amounts[k]! > 0);
+      if (!p && !items.length) return;
+      if (!p) {
+        p = await one(`INSERT INTO fee_plans (academic_year_id, name, plan_type, class_level_id, description) VALUES ($1,$2,$3,$4,'Class-wise fee structure') RETURNING id`, [y.id, name, type, classLevelId], c);
+      }
+      // Replace only the structure categories; any other items added to the plan by hand are kept.
+      await c.query('DELETE FROM fee_plan_items WHERE fee_plan_id = $1 AND fee_category_id = ANY($2)', [p!.id, allowed.filter((k) => catBy[k]).map((k) => catBy[k].id)]);
+      for (const k of items) {
+        await c.query('INSERT INTO fee_plan_items (fee_plan_id, fee_category_id, amount_paise, frequency) VALUES ($1,$2,$3,$4)', [p!.id, catBy[k].id, amounts[k], catBy[k].default_frequency]);
+      }
+      touched.push(p!.id);
+    };
+    for (const r of b.rows) {
+      const cl = await one('SELECT name, is_preschool FROM class_levels WHERE id = $1', [r.classLevelId], c);
+      if (!cl) throw badRequest('Unknown class.');
+      await upsertPlan(`${cl.name} – ${y.name}`, cl.is_preschool ? 'preschool' : 'school', r.classLevelId, r.amounts as any, STRUCTURE_CATEGORIES);
+    }
+    if (b.hostel) await upsertPlan(`Hostel – ${y.name}`, 'hostel', null, b.hostel as any, HOSTEL_CATEGORIES);
+    await audit(req, 'fee_structure.save', 'academic_year', y.id, { plans: touched.length }, c);
+  });
+  // Give students who have no plan yet the plan of their class (and bill them), so fees start automatically.
+  let assigned = 0;
+  if (b.applyToStudents) {
+    const ens = await q(`SELECT e.id FROM enrollments e WHERE e.academic_year_id = $1 AND e.status = 'active'`, [y.id]);
+    for (const e of ens) {
+      const r = await tx((c) => autoAssignPlans(c, e.id, req.user!.id));
+      if (r.length) { assigned++; await billUpToNow(e.id, req.user!.id); }
+    }
+  }
+  res.json({ ok: true, plans: touched.length, studentsAssigned: assigned });
 }));
 
 /** Preview what an enrollment would be billed for a month (no data is written). */
@@ -254,7 +338,12 @@ feesRouter.get('/students/:id/statement', ah(async (req, res) => {
        LEFT JOIN class_levels cl ON cl.id = e.class_level_id LEFT JOIN sections sec ON sec.id = e.section_id
        LEFT JOIN academic_years y ON y.id = e.academic_year_id LEFT JOIN transport_routes r ON r.id = e.transport_route_id WHERE st.id = $1`, [sid]);
   if (!st) throw notFound();
-  res.json({ student: st, ...(await statement(sid)) });
+  const structure = st.enrollment_id ? await q(
+    `SELECT p.name AS plan_name, p.plan_type, fc.name AS category, fc.name_hi AS category_hi, i.frequency, i.amount_paise
+       FROM student_fee_plans sp JOIN fee_plans p ON p.id = sp.fee_plan_id JOIN fee_plan_items i ON i.fee_plan_id = p.id
+       JOIN fee_categories fc ON fc.id = i.fee_category_id WHERE sp.enrollment_id = $1 ORDER BY p.plan_type DESC, fc.id`, [st.enrollment_id]) : [];
+  const route = st.transport_opted ? await one(`SELECT r.name, r.monthly_fee_paise FROM enrollments e JOIN transport_routes r ON r.id = e.transport_route_id WHERE e.id = $1`, [st.enrollment_id]) : null;
+  res.json({ student: st, structure, route, ...(await statement(sid)) });
 }));
 
 // ---------- Payments ----------

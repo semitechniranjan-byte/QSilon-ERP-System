@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
-import { Async, Badge, Card, Field, FileInput, Modal, PageHeader, StatusBadge, Tabs, useAction, useApi, useUi } from '../../components/ui';
+import { Async, Badge, Card, DeleteButton, Field, FileInput, Modal, PageHeader, StatusBadge, Tabs, useAction, useApi, useUi } from '../../components/ui';
 import { DataTable } from '../../components/DataTable';
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
@@ -78,6 +78,7 @@ function Years() {
         <table className="min-w-full text-sm"><tbody className="divide-y">{lk?.years.map((y) => (
           <tr key={y.id}><td className="td font-medium">{y.name} {y.is_current && <Badge tone="green">current</Badge>}</td><td className="td">{fmtDate(y.start_date)} – {fmtDate(y.end_date)}</td><td className="td"><StatusBadge status={y.status} /></td>
             <td className="td whitespace-nowrap text-right"><button className="link mr-3" onClick={() => setEdit({ id: y.id, name: y.name, startDate: y.start_date, endDate: y.end_date, status: y.status })}>Edit</button>
+              {!y.is_current && <DeleteButton className="link mr-3 text-red-600" url={`/api/settings/years/${y.id}`} what={`Academic year ${y.name}`} />}
               {!y.is_current && <button className="link" onClick={async () => { if (await confirm({ title: 'Make current year', message: `Switch the whole school to ${y.name}? Dashboards, attendance and portals will use this year.` })) run(() => api.post(`/api/settings/years/${y.id}/make-current`)); }}>Make current</button>}</td></tr>))}</tbody></table>
       </Card>
       <Card title="Terms" actions={<button className="btn-primary btn-sm" onClick={() => setTerm({ academicYearId: lk?.years.find((y) => y.is_current)?.id ?? '', name: '', startDate: '', endDate: '' })}><Plus className="h-4 w-4" />Term</button>} bodyClass="p-0">
@@ -119,7 +120,7 @@ function SimpleList({ title, path, rows }: { title: string; path: string; rows: 
   return (
     <Card title={title} actions={<button className="btn-primary btn-sm" onClick={() => setEdit({ code: '', name: '', isActive: true })}><Plus className="h-4 w-4" />Add</button>} bodyClass="p-0">
       <table className="min-w-full text-sm"><tbody className="divide-y">{rows.map((r) => <tr key={r.id}><td className="td font-mono">{r.code}</td><td className="td">{r.name}</td><td className="td">{r.is_active ? '' : <Badge>inactive</Badge>}</td>
-        <td className="td text-right"><button className="link" onClick={() => setEdit({ id: r.id, code: r.code, name: r.name, isActive: r.is_active })}>Edit</button></td></tr>)}</tbody></table>
+        <td className="td whitespace-nowrap text-right"><button className="link mr-3" onClick={() => setEdit({ id: r.id, code: r.code, name: r.name, isActive: r.is_active })}>Edit</button><DeleteButton url={`${path}/${r.id}`} what={r.name} /></td></tr>)}</tbody></table>
       {edit && (
         <Modal open onClose={() => setEdit(null)} title={title} footer={<><button className="btn-secondary" onClick={() => setEdit(null)}>Cancel</button>
           <button className="btn-primary" disabled={busy} onClick={async () => { if (await run(() => (edit.id ? api.put(`${path}/${edit.id}`, edit) : api.post(path, edit)))) setEdit(null); }}>Save</button></>}>
@@ -148,12 +149,12 @@ function Grading() {
     <div className="grid gap-4 lg:grid-cols-2">
       <Card title="Grading scales" actions={<button className="btn-primary btn-sm" onClick={() => setEdit({ id: 'new', name: '', isDefault: false, bands: [{ minPercent: 0, grade: 'E', gradePoint: 0, remark: '' }] })}><Plus className="h-4 w-4" />Scale</button>}>
         <Async q={q}>{(scales) => <div className="space-y-4">{scales.map((s) => (
-          <div key={s.id}><div className="flex justify-between"><p className="font-medium">{s.name} {s.is_default && <Badge tone="green">default</Badge>}</p><button className="link text-sm" onClick={() => setEdit({ id: s.id, name: s.name, isDefault: s.is_default, bands: s.bands.map((b: any) => ({ minPercent: b.min_percent, grade: b.grade, gradePoint: b.grade_point, remark: b.remark ?? '' })) })}>Edit</button></div>
+          <div key={s.id}><div className="flex justify-between"><p className="font-medium">{s.name} {s.is_default && <Badge tone="green">default</Badge>}</p><span className="flex gap-3"><button className="link text-sm" onClick={() => setEdit({ id: s.id, name: s.name, isDefault: s.is_default, bands: s.bands.map((b: any) => ({ minPercent: b.min_percent, grade: b.grade, gradePoint: b.grade_point, remark: b.remark ?? '' })) })}>Edit</button>{!s.is_default && <DeleteButton className="link text-sm text-red-600" url={`/api/settings/grading/${s.id}`} what={`Grading scale "${s.name}"`} />}</span></div>
             <p className="text-sm text-slate-600">{s.bands.map((b: any) => `${b.grade} ≥ ${b.min_percent}%`).join(' · ')}</p></div>))}</div>}</Async>
       </Card>
       <Card title="Preschool assessment areas" actions={<button className="btn-primary btn-sm" onClick={() => setDom({ name: '', nameHi: '', sortOrder: (lk?.domains.length ?? 0) + 1, isActive: true })}><Plus className="h-4 w-4" />Area</button>} bodyClass="p-0">
         <table className="min-w-full text-sm"><tbody className="divide-y">{lk?.domains.map((d) => <tr key={d.id}><td className="td">{d.sort_order}</td><td className="td">{d.name}</td><td className="td">{d.name_hi}</td><td className="td">{d.is_active ? '' : <Badge>inactive</Badge>}</td>
-          <td className="td text-right"><button className="link" onClick={() => setDom({ id: d.id, name: d.name, nameHi: d.name_hi ?? '', sortOrder: d.sort_order, isActive: d.is_active })}>Edit</button></td></tr>)}</tbody></table>
+          <td className="td whitespace-nowrap text-right"><button className="link mr-3" onClick={() => setDom({ id: d.id, name: d.name, nameHi: d.name_hi ?? '', sortOrder: d.sort_order, isActive: d.is_active })}>Edit</button><DeleteButton url={`/api/settings/domains/${d.id}`} what={d.name} /></td></tr>)}</tbody></table>
       </Card>
       {edit && (
         <Modal open size="lg" onClose={() => setEdit(null)} title="Grading scale" footer={<><button className="btn-secondary" onClick={() => setEdit(null)}>Cancel</button>

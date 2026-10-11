@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Plus, Trash2 } from 'lucide-react';
 import { api, ApiError } from '../../lib/api';
 import { Card, Field, FileInput, Loading, Modal, PageHeader, useAction, useApi, useUi } from '../../components/ui';
-import { CredentialsModal, PasswordField } from '../../components/Credentials';
+import { PasswordField } from '../../components/Credentials';
 import { useI18n } from '../../lib/i18n';
 import { useLookups } from '../../lib/lookups';
 import { fullName, inr, todayISO } from '../../lib/format';
@@ -48,7 +48,12 @@ export default function StudentForm() {
   const applicablePlans = useMemo(() => (plans.data ?? []).filter((p) => p.is_active && section && (
     (p.plan_type === 'preschool' && section.is_preschool) || (p.plan_type === 'school' && !section.is_preschool) || (p.plan_type === 'hostel' && enr.residency === 'hostel')
   ) && (!p.class_level_id || p.class_level_id === section.class_level_id)), [plans.data, section, enr.residency]);
-  useEffect(() => { setPlanIds((ids) => ids.filter((x) => applicablePlans.some((p) => p.id === x))); }, [applicablePlans]);
+  // Automatically pick the class's own fee plan (and the hostel plan for hostel residents).
+  useEffect(() => {
+    if (!section) return setPlanIds([]);
+    const pick = (type: string) => applicablePlans.find((p) => p.plan_type === type && p.class_level_id === section.class_level_id) ?? applicablePlans.find((p) => p.plan_type === type);
+    setPlanIds([pick(section.is_preschool ? 'preschool' : 'school'), enr.residency === 'hostel' ? pick('hostel') : undefined].filter(Boolean).map((p) => p!.id));
+  }, [applicablePlans, section?.id, enr.residency]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!enr.sectionId || editing) return;
     api.get(`/api/students/next-roll/${enr.sectionId}`).then((r) => setEnr((e) => ({ ...e, rollNo: String(r.rollNo) }))).catch(() => {});
@@ -76,7 +81,7 @@ export default function StudentForm() {
     });
     try {
       const r = await api.post('/api/students', body);
-      setCreds({ ...r, name: fullName({ first_name: f.firstName, last_name: f.lastName }), studentId: r.student.id });
+      setCreds({ ...r, name: fullName({ first_name: f.firstName, last_name: f.lastName }), studentId: r.student.id, rollNo: r.enrollment.roll_no, admissionNo: r.student.admission_no });
     } catch (e) {
       if (e instanceof ApiError && e.details?.code === 'POSSIBLE_DUPLICATE') return setDupes(e.details.matches);
       if (e instanceof ApiError && e.fields) setErr(e.fields);
@@ -222,7 +227,35 @@ export default function StudentForm() {
         <p className="mb-3 text-sm text-slate-600">These existing students have the same name and date of birth:</p>
         <ul className="divide-y rounded-lg border text-sm">{dupes?.map((d) => <li key={d.id} className="p-3"><a className="link" href={`/admin/students/${d.id}`} target="_blank" rel="noreferrer">{fullName(d)}</a> · {d.student_code} · {d.admission_no} · {d.status}</li>)}</ul>
       </Modal>
-      <CredentialsModal creds={creds} onClose={() => { const sid = creds?.studentId; setCreds(null); nav(`/admin/students/${sid}`); }} />
+      {creds && <AdmissionDone r={creds} onClose={() => { const sid = creds.studentId; setCreds(null); nav(`/admin/students/${sid}`); }} />}
     </>
+  );
+}
+
+/** Shown right after admission: IDs, login, dues, and the documents to print. */
+function AdmissionDone({ r, onClose }: { r: any; onClose: () => void }) {
+  const nav = useNavigate();
+  const go = (to: string) => { onClose(); setTimeout(() => nav(to), 0); };
+  return (
+    <Modal open onClose={onClose} title="Admission complete" footer={<button className="btn-primary" onClick={onClose}>Open student profile</button>}>
+      <div className="print-area space-y-4 text-sm">
+        <div className="rounded-lg border bg-slate-50 p-4">
+          <p className="mb-2 text-base font-semibold">{r.name}</p>
+          <div className="grid grid-cols-2 gap-1">
+            <span className="text-slate-500">Student ID (login)</span><b className="font-mono">{r.username}</b>
+            <span className="text-slate-500">Admission No.</span><b>{r.admissionNo}</b>
+            <span className="text-slate-500">Roll No.</span><b>{r.rollNo}</b>
+            <span className="text-slate-500">Password</span><b className="font-mono">{r.password}</b>
+          </div>
+          {r.mustChange && <p className="mt-2 text-xs text-amber-700">Temporary password – the student will set a new one at first sign-in.</p>}
+        </div>
+        <p>{r.outstandingPaise > 0 ? <>Fees billed so far: <b className="text-amber-700">{inr(r.outstandingPaise)}</b> (admission fee and dues up to this month).</> : 'No fees billed yet — set the class fee structure under Fees → Fee Plans.'}</p>
+        <div className="no-print grid gap-2 sm:grid-cols-3">
+          <button className="btn-secondary" onClick={() => go(`/admin/students/${r.studentId}/admission-card`)}>Print admission card</button>
+          {r.outstandingPaise > 0 && <button className="btn-primary" onClick={() => go(`/admin/fees/collect?studentId=${r.studentId}`)}>Collect fee &amp; receipt</button>}
+          <button className="btn-secondary" onClick={() => go(`/admin/students/${r.studentId}/fee-card`)}>Fee card</button>
+        </div>
+      </div>
+    </Modal>
   );
 }

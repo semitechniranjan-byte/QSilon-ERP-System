@@ -27,7 +27,7 @@ export function errorHandler(err: any, _req: Request, res: Response, _next: Next
   }
   // Map common Postgres constraint errors to safe messages.
   if (err?.code === '23505') return res.status(409).json({ error: duplicateMessage(err.constraint) });
-  if (err?.code === '23503') return res.status(409).json({ error: 'This record is linked to other records and cannot be changed this way.' });
+  if (err?.code === '23503') return res.status(409).json({ error: 'This item is already in use (by students, marks, fees or other records), so it cannot be deleted. Edit it or mark it inactive instead.' });
   if (err?.code === '23514' || err?.code === '22P02' || err?.code === '22007' || err?.code === '22008') {
     return res.status(400).json({ error: 'Some values are invalid.' });
   }

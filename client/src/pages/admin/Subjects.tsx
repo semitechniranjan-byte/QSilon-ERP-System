@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Plus } from 'lucide-react';
-import { Card, Field, Modal, PageHeader, useAction } from '../../components/ui';
+import { Card, DeleteButton, Field, Modal, PageHeader, useAction } from '../../components/ui';
 import { DataTable } from '../../components/DataTable';
 import { api } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
@@ -17,7 +17,7 @@ export default function Subjects() {
       <Card bodyClass="p-0">
         {lk && <DataTable rows={lk.subjects} search={(r) => `${r.name} ${r.code}`} columns={[
           { key: 'code', header: 'Code' }, { key: 'name', header: t('Name') }, { key: 'name_hi', header: 'Hindi name' }, { key: 'a', header: 'Active', render: (r) => (r.is_active ? 'Yes' : 'No') },
-          { key: 'e', header: '', sortable: false, render: (r) => <button className="link" onClick={() => setEdit({ id: r.id, name: r.name, nameHi: r.name_hi ?? '', code: r.code, isActive: r.is_active })}>{t('Edit')}</button> }]} />}
+          { key: 'e', header: '', sortable: false, render: (r) => <span className="flex gap-3"><button className="link" onClick={() => setEdit({ id: r.id, name: r.name, nameHi: r.name_hi ?? '', code: r.code, isActive: r.is_active })}>{t('Edit')}</button><DeleteButton url={`/api/settings/subjects/${r.id}`} what={`Subject "${r.name}"`} /></span> }]} />}
       </Card>
       {edit && (
         <Modal open onClose={() => setEdit(null)} title={edit.id ? t('Edit') : t('Add')} footer={<><button className="btn-secondary" onClick={() => setEdit(null)}>{t('Cancel')}</button>

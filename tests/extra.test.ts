@@ -65,6 +65,49 @@ describe('first-start academic setup', () => {
   });
 });
 
+describe('class-wise fees, roll numbers and safe deletes', () => {
+  it('applies the class fee structure automatically at admission and bills immediately', async () => {
+    const admin = await new Client(app).login('principal', 'Principal123');
+    const st = ok(await admin.get('/api/fees/structure'));
+    const c3 = st.rows.find((r: any) => r.className === 'Class 3');
+    const nur = st.rows.find((r: any) => r.className === 'Nursery');
+    ok(await admin.put('/api/fees/structure', { academicYearId: st.year.id, rows: [
+      { classLevelId: c3.classLevelId, amounts: { ADMISSION: '2500', TUITION: '1500', BOOKS: '1200' } },
+      { classLevelId: nur.classLevelId, amounts: { ADMISSION: '2000', TUITION: '1000' } }], hostel: { HOSTEL: '4000' } }));
+    const lk = ok(await admin.get('/api/settings/lookups'));
+    const sec3 = lk.sections.find((x: any) => x.class_name === 'Class 3');
+    const admit = async (firstName: string, extra: any = {}) => ok(await admin.post('/api/students', { firstName, dob: '2018-02-02', guardians: [{ name: 'P', relation: 'Father', phone: '9000022222' }],
+      enrollment: { sectionId: sec3.id, residency: 'day_scholar', transportOpted: false }, password: 'child123', ...extra }), 201);
+    const z = await admit('Zoya');
+    expect(z.outstandingPaise).toBeGreaterThanOrEqual(2500_00 + 1500_00); // admission + at least one month's tuition, billed at once
+    expect(z.mustChange).toBe(false);
+    const a = await admit('Aman', { enrollment: { sectionId: sec3.id, residency: 'hostel', transportOpted: false } });
+    const stmt = ok(await admin.get(`/api/fees/students/${a.student.id}/statement`));
+    expect(stmt.structure.map((x: any) => x.category)).toContain('Hostel Charges'); // hostel plan added for a hostel resident
+    // Roll numbers: in admission order 1, 2 … then re-numbered alphabetically on request.
+    expect([z.enrollment.roll_no, a.enrollment.roll_no]).toEqual([1, 2]);
+    ok(await admin.post(`/api/academics/sections/${sec3.id}/renumber`, { order: 'alphabetical' }));
+    const list = ok(await admin.get(`/api/academics/sections/${sec3.id}/students`));
+    expect(list.map((x: any) => x.first_name)).toEqual(['Aman', 'Zoya']);
+    // The student logs in with the ID and the password the Principal chose.
+    await new Client(app).login(z.username, 'child123');
+    // Safe deletes: unused items go, used ones are refused with a clear message.
+    const sub = ok(await admin.post('/api/settings/subjects', { code: 'MUSIC', name: 'Music' }), 201);
+    ok(await admin.del(`/api/settings/subjects/${sub.id}`));
+    const eng = lk.subjects.find((x: any) => x.code === 'ENG');
+    const t = ok(await admin.post('/api/teachers', { firstName: 'Temp', password: 'teach123' }), 201);
+    ok(await admin.post('/api/academics/assignments', { teacherId: t.teacher.id, items: [{ sectionId: sec3.id, subjectId: eng.id }] }), 201);
+    const refused = await admin.del(`/api/settings/subjects/${eng.id}`);
+    expect(refused.status).toBe(400);
+    expect(refused.body.error).toMatch(/inactive/);
+    ok(await admin.del(`/api/teachers/${t.teacher.id}`)); // no recorded work yet → allowed
+    expect((await admin.del(`/api/academics/sections/${sec3.id}`)).status).toBe(400); // students enrolled
+    ok(await admin.del(`/api/students/${z.student.id}`)); // no payments/attendance yet → allowed
+    ok(await admin.post('/api/fees/payments', { studentId: a.student.id, amount: '100', mode: 'cash' }), 201);
+    expect((await admin.del(`/api/students/${a.student.id}`)).status).toBe(400); // has a payment → refused
+  });
+});
+
 describe('demo data', () => {
   it('can be seeded and removed without touching real records', async () => {
     const { removeDemo } = await import('../server/seed/demo.js');

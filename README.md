@@ -51,15 +51,14 @@ No other paid service is required.
 
 ### Step 4 – Configure the school (in this order)
 1. **Settings → School profile:** name (English/Hindi), logo, address, phone, email, map link, established year, statistics mode, ID/receipt prefixes, login options.
-2. **Settings → Academic years:** create the current year (e.g. `2026-27`, 01-04-2026 to 31-03-2027).
-3. **Classes & Sections:** classes Playgroup–Class 12 are pre-created; add sections (A, B …) with board, medium, class teacher, capacity.
-4. **Subjects**, then **Classes & Sections → Class subjects** for each class.
-5. **Teachers:** add teachers (ID + login generated), then **Assign subjects** per class/section.
-6. **Fees → Fee Plans:** a preschool plan, school plans per class, and a hostel plan. **Transport:** add routes with monthly fees.
-7. **Hostel:** hostels, rooms (beds are created from capacity).
-8. **Admissions:** admit students (ID, admission no., roll no. and login generated) and choose fee plans.
-9. **Fees → Invoices → Generate invoices** each month (or for a range of months). Then collect fees.
-10. **Website:** edit page content, facilities and gallery.
+2. **Academic year and sections are automatic:** the current year (April–March) and Section A for every class (Nursery–Class 12) with default subjects are created on first start. Add more years/sections in **Settings → Academic years** and **Classes & Sections**.
+3. **Subjects** and **Classes & Sections → Class subjects:** add, edit or delete as needed (items already in use cannot be deleted — mark them inactive instead).
+4. **Teachers:** add teachers (ID + login generated), then **Assign subjects** per class/section.
+5. **Fees → Fee Plans → Class-wise fee structure:** enter Admission, Tuition, Annual, Exam etc. for each class (and Hostel/Mess for hostellers) and save. **Transport:** add routes with monthly fees.
+6. **Hostel:** hostels, rooms (beds are created from capacity).
+7. **Admissions:** choose the class — its fee plan (and hostel plan for hostellers) is applied automatically and the admission fee + current month are billed at once. After admitting, print the **Admission card**, collect the fee (**receipt**) and print the **Fee card**. Roll numbers are given in order (next number in the section); **Classes & Sections → A–Z re-number** renumbers a section alphabetically.
+8. **Fees → Invoices → Generate invoices** each month for later months (or for a range of months). Then collect fees.
+9. **Website:** edit page content, facilities and gallery.
 
 ### Sample data for demonstrations
 Sign in as Principal → **Settings → Sample data**, choose one password for all sample accounts and click **Load sample data**.

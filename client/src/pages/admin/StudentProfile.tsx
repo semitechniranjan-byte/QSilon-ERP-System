@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { Async, Badge, Card, Field, FileInput, Modal, PageHeader, StatusBadge, useAction, useApi, useUi } from '../../components/ui';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Async, Badge, Card, DeleteButton, Field, FileInput, Modal, PageHeader, StatusBadge, useAction, useApi, useUi } from '../../components/ui';
 import { CredentialsModal, SetPasswordModal } from '../../components/Credentials';
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
@@ -10,6 +10,7 @@ import { fmtDate, fullName, inr, todayISO } from '../../lib/format';
 
 export default function StudentProfile() {
   const { id } = useParams();
+  const nav = useNavigate();
   const { t } = useI18n();
   const { can, user } = useAuth();
   const q = useApi<any>(`/api/students/${id}`);
@@ -34,6 +35,8 @@ export default function StudentProfile() {
             subtitle={<span className="flex flex-wrap items-center gap-2"><span className="font-mono">{s.student_code}</span> · {t('Admission No.')} {s.admission_no} <StatusBadge status={s.status} /></span>}
             actions={manage && <>
               <Link to={`/admin/students/${id}/edit`} className="btn-secondary">{t('Edit')}</Link>
+              <Link to={`/admin/students/${id}/admission-card`} className="btn-secondary">Admission card</Link>
+              {can('fees.view') && <Link to={`/admin/students/${id}/fee-card`} className="btn-secondary">Fee card</Link>}
               {can('fees.view') && <Link to={`/admin/fees/student/${id}`} className="btn-secondary">{t('Fee statement')}</Link>}
               <button className="btn-secondary" onClick={() => setSetPw(true)}>Set password</button>
               <button className="btn-secondary" onClick={async () => {
@@ -42,6 +45,7 @@ export default function StudentProfile() {
                   if (r) setCreds({ ...r, name: fullName(s) });
                 }
               }}>Temporary password</button>
+              <DeleteButton className="btn-ghost text-red-600" url={`/api/students/${id}`} what={`Student ${fullName(s)}`} onDone={() => nav('/admin/students')} />
               {s.status === 'active' ? <button className="btn-danger" onClick={() => setWithdraw(true)}>Withdraw / Transfer</button> : <button className="btn-primary" onClick={() => setReadmit(true)}>Re-admit</button>}
             </>} />
           <div className="grid gap-4 lg:grid-cols-3">

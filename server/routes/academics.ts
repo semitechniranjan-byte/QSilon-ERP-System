@@ -68,6 +68,49 @@ academicsRouter.put('/sections/:id', requirePerm('academics.manage'), ah(async (
   res.json(row);
 }));
 
+academicsRouter.delete('/sections/:id', requirePerm('academics.manage'), ah(async (req, res) => {
+  const sid = id.parse(req.params.id);
+  await tx(async (c) => {
+    const used = await one('SELECT count(*)::int AS n FROM enrollments WHERE section_id=$1', [sid], c);
+    if (used.n > 0) throw badRequest(`${used.n} student(s) are (or were) in this section, so it cannot be deleted. Mark it inactive instead.`);
+    await c.query('DELETE FROM timetable_entries WHERE section_id=$1', [sid]);
+    await c.query('DELETE FROM teaching_assignments WHERE section_id=$1', [sid]);
+    const r = await one('DELETE FROM sections WHERE id=$1 RETURNING name', [sid], c);
+    if (!r) throw notFound();
+    await audit(req, 'section.delete', 'section', sid, r, c);
+  });
+  res.json({ ok: true });
+}));
+
+/** Re-number roll numbers 1..n in a section, alphabetically (by name) or by admission order. */
+academicsRouter.post('/sections/:id/renumber', requirePerm('students.manage'), ah(async (req, res) => {
+  const sid = id.parse(req.params.id);
+  const { order } = z.object({ order: z.enum(['alphabetical', 'admission']) }).parse(req.body);
+  const n = await tx(async (c) => {
+    await c.query('SELECT id FROM sections WHERE id = $1 FOR UPDATE', [sid]);
+    const rows = await q(
+      `SELECT e.id, e.roll_no FROM enrollments e JOIN students st ON st.id = e.student_id
+        WHERE e.section_id = $1 AND e.status = 'active'
+        ORDER BY ${order === 'alphabetical' ? "lower(st.first_name), lower(coalesce(st.last_name,'')), st.dob" : 'st.admission_date, st.id'}`, [sid], c);
+    const used = await one(`SELECT coalesce(max(roll_no), 0) AS m FROM enrollments WHERE section_id = $1`, [sid], c);
+    // Move active rolls out of the way first so the unique (section, roll) rule is never violated mid-update.
+    let tmp = used.m + 1000;
+    for (const r of rows) await c.query('UPDATE enrollments SET roll_no = $2 WHERE id = $1', [r.id, tmp++]);
+    const taken = new Set((await q(`SELECT roll_no FROM enrollments WHERE section_id = $1 AND status <> 'active'`, [sid], c)).map((r) => r.roll_no));
+    let next = 1;
+    const changes: { enrollmentId: number; from: number; to: number }[] = [];
+    for (const r of rows) {
+      while (taken.has(next)) next++;
+      await c.query('UPDATE enrollments SET roll_no = $2 WHERE id = $1', [r.id, next]);
+      if (r.roll_no !== next) changes.push({ enrollmentId: r.id, from: r.roll_no, to: next });
+      next++;
+    }
+    await audit(req, 'section.renumber_rolls', 'section', sid, { order, changes }, c);
+    return rows.length;
+  });
+  res.json({ ok: true, students: n });
+}));
+
 /** Section students: admins and teachers assigned to the section. */
 academicsRouter.get('/sections/:id/students', ah(async (req, res) => {
   const sid = id.parse(req.params.id);

@@ -238,3 +238,16 @@ export function FileInput({ purpose, accept, onUploaded, label = 'Upload file' }
     </label>
   );
 }
+
+/** Delete with confirmation. The server refuses (with a clear message) when the item is already in use. */
+export function DeleteButton({ url, what, onDone, className = 'link text-red-600', label = 'Delete' }: { url: string; what: string; onDone?: () => void; className?: string; label?: ReactNode }) {
+  const { confirm } = useUi();
+  const { run } = useAction();
+  return (
+    <button type="button" className={className} onClick={async (e) => {
+      e.stopPropagation();
+      if (!(await confirm({ title: `Delete ${what}?`, message: 'This cannot be undone. If it is already in use, you will be asked to mark it inactive instead.', danger: true, confirmLabel: 'Delete' }))) return;
+      if (await run(() => api.del(url), { success: `${what} deleted.` })) onDone?.();
+    }}>{label}</button>
+  );
+}

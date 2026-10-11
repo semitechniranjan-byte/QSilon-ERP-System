@@ -154,8 +154,9 @@ describe('Workflow 3: attendance', () => {
 
 describe('Workflow 4: fee calculation', () => {
   it('applies preschool, transport and hostel rules without duplicates', async () => {
+    // Fees are billed automatically at admission; generating again adds nothing new.
     const g = ok(await admin.post('/api/fees/invoices/generate', { fromMonth: thisMonth, toMonth: thisMonth }));
-    expect(g.linesAdded).toBeGreaterThan(0);
+    expect(g.linesAdded).toBe(0);
     const lines = async (sid: number) => (ok(await admin.get(`/api/fees/students/${sid}/statement`)).invoices as any[]).flatMap((i) => i.lines);
     const p1 = await lines(T.P1);
     expect(p1.map((l) => l.fee_category_id).sort()).toEqual([T.cat.ADMISSION, T.cat.PRESCHOOL, T.cat.UNIFORM].sort());

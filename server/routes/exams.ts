@@ -107,6 +107,22 @@ examsRouter.put('/:id/subjects', requirePerm('exams.manage'), ah(async (req, res
   res.json({ ok: true });
 }));
 
+examsRouter.delete('/:id', requirePerm('exams.manage'), ah(async (req, res) => {
+  const eid = id.parse(req.params.id);
+  await tx(async (c) => {
+    const e = await one('SELECT status FROM exams WHERE id=$1 FOR UPDATE', [eid], c);
+    if (!e) throw notFound();
+    const used = await one(`SELECT (SELECT count(*) FROM marks m JOIN exam_subjects es ON es.id = m.exam_subject_id WHERE es.exam_id = $1)
+                                 + (SELECT count(*) FROM development_assessments WHERE exam_id = $1) AS n`, [eid], c);
+    if (Number(used.n) > 0 || e.status === 'published') throw badRequest('Marks have already been entered for this exam, so it cannot be deleted. Withdraw it instead.');
+    await c.query('DELETE FROM mark_submissions WHERE exam_subject_id IN (SELECT id FROM exam_subjects WHERE exam_id=$1)', [eid]);
+    await c.query('DELETE FROM report_card_remarks WHERE exam_id=$1', [eid]);
+    await c.query('DELETE FROM exams WHERE id=$1', [eid]); // exam_subjects cascade
+    await audit(req, 'exam.delete', 'exam', eid, undefined, c);
+  });
+  res.json({ ok: true });
+}));
+
 examsRouter.post('/:id/status', requirePerm('exams.manage'), ah(async (req, res) => {
   const eid = id.parse(req.params.id);
   const b = z.object({ status: z.enum(['draft', 'marks_entry']).optional(), schedulePublished: bool.optional() }).parse(req.body);

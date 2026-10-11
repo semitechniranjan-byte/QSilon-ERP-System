@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
-import { Async, Badge, Card, Field, Modal, PageHeader, Tabs, useAction, useApi } from '../../../components/ui';
+import { Async, Badge, Card, DeleteButton, Field, Modal, PageHeader, Tabs, useAction, useApi, useUi } from '../../../components/ui';
 import { DataTable } from '../../../components/DataTable';
 import { api } from '../../../lib/api';
 import { useAuth } from '../../../lib/auth';
@@ -12,12 +12,12 @@ const FREQ = [['one_time', 'One-time'], ['monthly', 'Monthly'], ['quarterly', 'Q
 
 export default function Plans() {
   const { t } = useI18n();
-  const [tab, setTab] = useState<'plans' | 'categories'>('plans');
+  const [tab, setTab] = useState<'structure' | 'plans' | 'categories'>('structure');
   return (
     <>
       <PageHeader title={t('Fee Plans')} />
-      <Tabs value={tab} onChange={setTab} tabs={[{ key: 'plans', label: t('Fee Plans') }, { key: 'categories', label: 'Fee categories' }]} />
-      {tab === 'plans' ? <PlanList /> : <Categories />}
+      <Tabs value={tab} onChange={setTab} tabs={[{ key: 'structure', label: 'Class-wise fee structure' }, { key: 'plans', label: t('Fee Plans') }, { key: 'categories', label: 'Fee categories' }]} />
+      {tab === 'structure' && <Structure />}{tab === 'plans' && <PlanList />}{tab === 'categories' && <Categories />}
     </>
   );
 }
@@ -43,7 +43,7 @@ function PlanList() {
         <div className="grid gap-4 lg:grid-cols-2">
           {plans.map((p) => (
             <Card key={p.id} title={<span>{p.name} <Badge tone={p.plan_type === 'preschool' ? 'amber' : p.plan_type === 'hostel' ? 'purple' : 'blue'}>{p.plan_type}</Badge> {!p.is_active && <Badge>inactive</Badge>}</span>}
-              actions={can('fees.manage') && <><button className="btn-secondary btn-sm" onClick={() => setAssign({ plan: p, sectionId: '', ids: [] })}>Assign</button>
+              actions={can('fees.manage') && <><DeleteButton className="btn-ghost btn-sm text-red-600" url={`/api/fees/plans/${p.id}`} what={`Fee plan "${p.name}"`} /><button className="btn-secondary btn-sm" onClick={() => setAssign({ plan: p, sectionId: '', ids: [] })}>Assign</button>
                 <button className="btn-secondary btn-sm" onClick={() => setEdit({ id: p.id, academicYearId: p.academic_year_id, name: p.name, planType: p.plan_type, classLevelId: p.class_level_id ?? '', description: p.description ?? '', isActive: p.is_active,
                   items: p.items.map((i: any) => ({ feeCategoryId: i.fee_category_id, amount: paiseToRupeeStr(i.amount_paise), frequency: i.frequency, dueDay: i.due_day })) })}>Edit</button></>}>
               <p className="mb-2 text-xs text-slate-500">{p.class_name ?? 'Any class'} · {p.students} student(s){p.description ? ` · ${p.description}` : ''}</p>
@@ -108,7 +108,7 @@ function Categories() {
     <Card bodyClass="p-0">
       {lk && <DataTable rows={lk.categories} toolbar={can('fees.manage') && <button className="btn-primary" onClick={() => setEdit({ code: '', name: '', nameHi: '', kind: 'other', defaultFrequency: 'one_time', isActive: true })}><Plus className="h-4 w-4" />Category</button>}
         columns={[{ key: 'code', header: 'Code' }, { key: 'name', header: 'Name' }, { key: 'name_hi', header: 'Hindi' }, { key: 'kind', header: 'Kind' }, { key: 'default_frequency', header: 'Default billing' }, { key: 'a', header: 'Active', render: (r) => (r.is_active ? 'Yes' : 'No') },
-          { key: 'e', header: '', sortable: false, render: (r) => can('fees.manage') && <button className="link" onClick={() => setEdit({ id: r.id, code: r.code, name: r.name, nameHi: r.name_hi ?? '', kind: r.kind, defaultFrequency: r.default_frequency, isActive: r.is_active })}>Edit</button> }]} />}
+          { key: 'e', header: '', sortable: false, render: (r) => can('fees.manage') && <span className="flex gap-3"><button className="link" onClick={() => setEdit({ id: r.id, code: r.code, name: r.name, nameHi: r.name_hi ?? '', kind: r.kind, defaultFrequency: r.default_frequency, isActive: r.is_active })}>Edit</button><DeleteButton url={`/api/fees/categories/${r.id}`} what={`Fee category "${r.name}"`} /></span> }]} />}
       {edit && (
         <Modal open onClose={() => setEdit(null)} title="Fee category" footer={<><button className="btn-secondary" onClick={() => setEdit(null)}>Cancel</button>
           <button className="btn-primary" disabled={busy} onClick={async () => { if (await run(() => (edit.id ? api.put(`/api/fees/categories/${edit.id}`, edit) : api.post('/api/fees/categories', edit)))) setEdit(null); }}>Save</button></>}>
@@ -123,5 +123,64 @@ function Categories() {
         </Modal>
       )}
     </Card>
+  );
+}
+
+const COLS = ['ADMISSION', 'TUITION', 'ANNUAL', 'EXAM', 'UNIFORM', 'BOOKS'] as const;
+const FREQ_LABEL: Record<string, string> = { one_time: 'one-time', monthly: 'per month', quarterly: 'per quarter', half_yearly: 'half-yearly', annual: 'per year' };
+
+/** One grid for the whole school: the Principal types each class's fees once; plans are created automatically. */
+function Structure() {
+  const { can } = useAuth();
+  const { lk, current } = useLookups();
+  const [yearId, setYearId] = useState<number | null>(null);
+  const y = yearId ?? current?.id;
+  const q = useApi<any>(y ? `/api/fees/structure?yearId=${y}` : null);
+  const [rows, setRows] = useState<Record<number, Record<string, string>>>({});
+  const [hostel, setHostel] = useState<Record<string, string>>({});
+  const { run, busy } = useAction();
+  const { toast } = useUi();
+  useEffect(() => {
+    if (!q.data) return;
+    const toStr = (items: any, k: string) => (items?.[k] ? paiseToRupeeStr(items[k].amount) : '');
+    setRows(Object.fromEntries(q.data.rows.map((r: any) => [r.classLevelId, Object.fromEntries(COLS.map((k) => [k, toStr(r.items, k)]))])));
+    setHostel({ HOSTEL: toStr(q.data.hostel?.items, 'HOSTEL'), MESS: toStr(q.data.hostel?.items, 'MESS') });
+  }, [q.data]);
+  const freqOf = (code: string) => q.data?.categories.find((c: any) => c.code === code)?.default_frequency;
+  const nameOf = (code: string) => q.data?.categories.find((c: any) => c.code === code)?.name ?? code;
+  const copyDown = (fromId: number) => {
+    const ids = q.data.rows.map((r: any) => r.classLevelId);
+    const i = ids.indexOf(fromId);
+    if (i >= 0 && i < ids.length - 1) setRows({ ...rows, [ids[i + 1]]: { ...rows[fromId] } });
+  };
+  return (
+    <Async q={q}>{(d) => (
+      <Card title={<div className="flex flex-wrap items-center gap-2">Fees for {d.year.name}<select className="input w-32" value={y ?? ''} onChange={(e) => setYearId(Number(e.target.value))} aria-label="Year">{lk?.years.map((yy) => <option key={yy.id} value={yy.id}>{yy.name}</option>)}</select></div>}
+        actions={can('fees.manage') && <button className="btn-primary" disabled={busy} onClick={async () => {
+          const r = await run(() => api.put('/api/fees/structure', { academicYearId: d.year.id, rows: Object.entries(rows).map(([k, v]) => ({ classLevelId: Number(k), amounts: v })), hostel, applyToStudents: true }), { success: false });
+          if (r) toast('success', `Fee structure saved (${r.plans} plans).${r.studentsAssigned ? ` ${r.studentsAssigned} existing students were given their class plan and billed.` : ''}`);
+        }}>Save fee structure</button>} bodyClass="p-0">
+        <p className="px-4 pt-3 text-sm text-slate-600">Enter each class's fees in rupees. Leave a box empty if that fee does not apply. When a student is admitted, the plan of their class is applied automatically
+          and the admission fee and dues up to the current month are billed. Transport is charged from the student's bus route only when transport is chosen.</p>
+        <div className="overflow-x-auto p-4">
+          <table className="min-w-full text-sm">
+            <thead><tr><th className="th">Class</th>{COLS.map((k) => <th key={k} className="th text-right">{nameOf(k)}<span className="block font-normal normal-case text-slate-400">{FREQ_LABEL[freqOf(k)] ?? ''}</span></th>)}<th className="th" /></tr></thead>
+            <tbody className="divide-y">{d.rows.map((r: any) => (
+              <tr key={r.classLevelId}>
+                <td className="td whitespace-nowrap font-medium">{r.className}{r.students > 0 && <span className="block text-xs font-normal text-slate-500">{r.students} students</span>}</td>
+                {COLS.map((k) => <td key={k} className="td"><input className="input w-24 text-right" inputMode="decimal" placeholder="—" disabled={!can('fees.manage')} value={rows[r.classLevelId]?.[k] ?? ''}
+                  onChange={(e) => setRows({ ...rows, [r.classLevelId]: { ...rows[r.classLevelId], [k]: e.target.value } })} aria-label={`${r.className} ${nameOf(k)}`} /></td>)}
+                <td className="td"><button className="link whitespace-nowrap text-xs" title="Copy these amounts to the next class" onClick={() => copyDown(r.classLevelId)}>copy ↓</button></td>
+              </tr>))}</tbody>
+          </table>
+          <div className="mt-5 rounded-lg border border-violet-200 bg-violet-50/50 p-4">
+            <p className="mb-2 font-semibold">Hostel residents (added on top of the class fees)</p>
+            <div className="flex flex-wrap gap-4">{(['HOSTEL', 'MESS'] as const).map((k) => (
+              <label key={k} className="text-sm">{nameOf(k)} <span className="text-slate-400">({FREQ_LABEL[freqOf(k)] ?? ''})</span>
+                <input className="input mt-1 w-32 text-right" inputMode="decimal" placeholder="—" disabled={!can('fees.manage')} value={hostel[k] ?? ''} onChange={(e) => setHostel({ ...hostel, [k]: e.target.value })} /></label>))}</div>
+          </div>
+        </div>
+      </Card>
+    )}</Async>
   );
 }

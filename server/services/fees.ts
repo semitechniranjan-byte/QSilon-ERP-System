@@ -381,3 +381,44 @@ export async function addManualCharge(enrollmentId: number, feeCategoryId: numbe
 }
 
 export type { PoolClient };
+
+/**
+ * Attach the class's fee plan (and the hostel plan for hostel residents) when the enrollment has none of that type.
+ * Prefers a plan made for the exact class; falls back to a single "any class" plan of the right type.
+ */
+export async function autoAssignPlans(c: Db, enrollmentId: number, userId: number | null) {
+  const e = await one(
+    `SELECT e.id, e.academic_year_id, e.class_level_id, e.residency, cl.is_preschool,
+            (SELECT array_agg(plan_type) FROM student_fee_plans sp WHERE sp.enrollment_id = e.id) AS types
+       FROM enrollments e JOIN class_levels cl ON cl.id = e.class_level_id WHERE e.id = $1`, [enrollmentId], c);
+  if (!e) return [];
+  const have: string[] = e.types ?? [];
+  const wanted = [e.is_preschool ? 'preschool' : 'school', ...(e.residency === 'hostel' ? ['hostel'] : [])].filter((t) => !have.includes(t));
+  const assigned: number[] = [];
+  for (const type of wanted) {
+    const plans = await q(
+      `SELECT id, class_level_id FROM fee_plans WHERE academic_year_id = $1 AND plan_type = $2 AND is_active AND (class_level_id = $3 OR class_level_id IS NULL)
+        ORDER BY (class_level_id IS NULL), id`, [e.academic_year_id, type, e.class_level_id], c);
+    const exact = plans.find((p) => p.class_level_id === e.class_level_id);
+    const generic = plans.filter((p) => p.class_level_id == null);
+    const plan = exact ?? (generic.length === 1 || type === 'hostel' ? generic[0] : undefined);
+    if (plan) { await assignPlan(c, enrollmentId, plan.id, userId); assigned.push(plan.id); }
+  }
+  return assigned;
+}
+
+/** Bill an enrollment for every month from joining up to the current month (idempotent). */
+export async function billUpToNow(enrollmentId: number, userId: number | null) {
+  const e = await one(`SELECT e.enrolled_on, y.start_date, y.end_date FROM enrollments e JOIN academic_years y ON y.id = e.academic_year_id WHERE e.id = $1`, [enrollmentId]);
+  if (!e) return 0;
+  const now = todayIST().slice(0, 7);
+  let added = 0;
+  for (let m = (e.enrolled_on > e.start_date ? e.enrolled_on : e.start_date).slice(0, 7); m <= now && m <= e.end_date.slice(0, 7); m = addMonths(m, 1)) {
+    added += (await generateForEnrollment(enrollmentId, m, userId)).added;
+  }
+  return added;
+}
+
+/** Class-wise fee structure grid: one school plan per class with the standard categories. */
+export const STRUCTURE_CATEGORIES = ['ADMISSION', 'TUITION', 'ANNUAL', 'EXAM', 'UNIFORM', 'BOOKS'] as const;
+export const HOSTEL_CATEGORIES = ['HOSTEL', 'MESS'] as const;

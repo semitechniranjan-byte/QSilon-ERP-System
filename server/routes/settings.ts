@@ -54,6 +54,8 @@ settingsRouter.put('/school', requirePerm('settings.manage'), ah(async (req, res
 
 // ---------- Lookups used throughout the UI ----------
 settingsRouter.get('/lookups', ah(async (req, res) => {
+  const { ensureCurrentYear } = await import('../lib/context.js');
+  await ensureCurrentYear();
   const staff = req.user!.role !== 'student' && req.user!.role !== 'parent';
   const [years, classes, boards, mediums, subjects, sections, categories, routes, terms, scales, domains] = await Promise.all([
     q('SELECT id, name, start_date, end_date, is_current, status FROM academic_years ORDER BY start_date DESC'),
@@ -103,6 +105,36 @@ settingsRouter.put('/years/:id', requirePerm('settings.manage'), ah(async (req, 
   await audit(req, 'academic_year.update', 'academic_year', row.id, b);
   res.json(row);
 }));
+settingsRouter.delete('/years/:id', requirePerm('settings.manage'), ah(async (req, res) => {
+  const yid = id.parse(req.params.id);
+  await tx(async (c) => {
+    const y = await one('SELECT is_current FROM academic_years WHERE id=$1', [yid], c);
+    if (!y) throw notFound();
+    if (y.is_current) throw badRequest('The current academic year cannot be deleted. Make another year current first.');
+    const used = await one('SELECT 1 FROM enrollments WHERE academic_year_id=$1 LIMIT 1', [yid], c);
+    if (used) throw badRequest('Students are enrolled in this year, so it cannot be deleted. Mark it closed instead.');
+    // Remove the empty structure of the year (sections, subjects mapping, periods, terms) together with it.
+    await c.query('DELETE FROM timetable_entries WHERE section_id IN (SELECT id FROM sections WHERE academic_year_id=$1)', [yid]);
+    await c.query('DELETE FROM teaching_assignments WHERE section_id IN (SELECT id FROM sections WHERE academic_year_id=$1)', [yid]);
+    await c.query('DELETE FROM sections WHERE academic_year_id=$1', [yid]);
+    await c.query('DELETE FROM class_subjects WHERE academic_year_id=$1', [yid]);
+    await c.query('DELETE FROM timetable_periods WHERE academic_year_id=$1', [yid]);
+    await c.query('DELETE FROM terms WHERE academic_year_id=$1', [yid]);
+    await c.query('DELETE FROM academic_years WHERE id=$1', [yid]);
+    await audit(req, 'academic_year.delete', 'academic_year', yid, undefined, c);
+  });
+  res.json({ ok: true });
+}));
+settingsRouter.delete('/grading/:id', requirePerm('exams.manage'), ah(async (req, res) => {
+  const sid = id.parse(req.params.id);
+  const s = await one('SELECT is_default FROM grading_scales WHERE id=$1', [sid]);
+  if (!s) throw notFound();
+  if (s.is_default) throw badRequest('The default grading scale cannot be deleted. Make another scale the default first.');
+  await pool.query('DELETE FROM grading_scales WHERE id=$1', [sid]);
+  await audit(req, 'grading.delete', 'grading_scale', sid);
+  res.json({ ok: true });
+}));
+
 settingsRouter.post('/years/:id/make-current', requirePerm('settings.manage'), ah(async (req, res) => {
   const yid = id.parse(req.params.id);
   await tx(async (c) => {
@@ -117,16 +149,31 @@ settingsRouter.post('/years/:id/make-current', requirePerm('settings.manage'), a
 
 crud(settingsRouter, { path: '/terms', table: 'terms', perm: 'settings.manage', readPerm: null, allowDelete: true, orderBy: 'academic_year_id, start_date NULLS LAST',
   schema: z.object({ academicYearId: id, name: str(80), startDate: optDate, endDate: optDate }) });
-crud(settingsRouter, { path: '/boards', table: 'boards', perm: 'settings.manage', readPerm: null,
+crud(settingsRouter, { path: '/boards', table: 'boards', perm: 'settings.manage', readPerm: null, allowDelete: true,
   schema: z.object({ code: z.string().trim().regex(/^[A-Z0-9_]{2,12}$/), name: str(120), isActive: bool.optional() }) });
-crud(settingsRouter, { path: '/mediums', table: 'mediums', perm: 'settings.manage', readPerm: null,
+crud(settingsRouter, { path: '/mediums', table: 'mediums', perm: 'settings.manage', readPerm: null, allowDelete: true,
   schema: z.object({ code: z.string().trim().regex(/^[A-Z0-9_]{2,12}$/), name: str(80), isActive: bool.optional() }) });
-crud(settingsRouter, { path: '/classes', table: 'class_levels', perm: 'academics.manage', readPerm: null, orderBy: 'sort_order',
+crud(settingsRouter, { path: '/classes', table: 'class_levels', perm: 'academics.manage', readPerm: null, orderBy: 'sort_order', allowDelete: true,
   schema: z.object({ name: str(60), nameHi: optStr(60), code: z.string().trim().regex(/^[A-Za-z0-9]{1,6}$/, 'Short code, letters/digits'), sortOrder: z.coerce.number().int(), isPreschool: bool, isActive: bool.optional() }) });
 crud(settingsRouter, { path: '/subjects', table: 'subjects', perm: 'academics.manage', readPerm: null, orderBy: 'name',
   schema: z.object({ name: str(80), nameHi: optStr(80), code: z.string().trim().regex(/^[A-Z0-9_]{2,12}$/, 'Uppercase code, e.g. MATH'), isActive: bool.optional() }) });
-crud(settingsRouter, { path: '/domains', table: 'assessment_domains', perm: 'exams.manage', readPerm: null, orderBy: 'sort_order',
+crud(settingsRouter, { path: '/domains', table: 'assessment_domains', perm: 'exams.manage', readPerm: null, orderBy: 'sort_order', allowDelete: true,
   schema: z.object({ name: str(80), nameHi: optStr(80), sortOrder: z.coerce.number().int().default(0), isActive: bool.optional() }) });
+
+settingsRouter.delete('/subjects/:id', requirePerm('academics.manage'), ah(async (req, res) => {
+  const sid = id.parse(req.params.id);
+  await tx(async (c) => {
+    const used = await one(`SELECT (SELECT count(*) FROM teaching_assignments WHERE subject_id=$1) + (SELECT count(*) FROM exam_subjects WHERE subject_id=$1)
+                                 + (SELECT count(*) FROM assignments WHERE subject_id=$1) + (SELECT count(*) FROM quizzes WHERE subject_id=$1)
+                                 + (SELECT count(*) FROM timetable_entries WHERE subject_id=$1) + (SELECT count(*) FROM study_materials WHERE subject_id=$1) AS n`, [sid], c);
+    if (Number(used.n) > 0) throw badRequest('This subject is used by teachers, exams, homework or the timetable, so it cannot be deleted. Mark it inactive instead.');
+    await c.query('DELETE FROM class_subjects WHERE subject_id=$1', [sid]);
+    const r = await one('DELETE FROM subjects WHERE id=$1 RETURNING name', [sid], c);
+    if (!r) throw notFound();
+    await audit(req, 'subjects.delete', 'subjects', sid, r, c);
+  });
+  res.json({ ok: true });
+}));
 
 // ---------- Grading ----------
 settingsRouter.get('/grading', ah(async (_req, res) => {

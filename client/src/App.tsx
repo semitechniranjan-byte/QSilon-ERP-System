@@ -14,6 +14,8 @@ const AdminDashboard = L(() => import('./pages/admin/Dashboard'));
 const Students = L(() => import('./pages/admin/Students'));
 const StudentForm = L(() => import('./pages/admin/StudentForm'));
 const StudentProfile = L(() => import('./pages/admin/StudentProfile'));
+const AdmissionCard = L(() => import('./pages/admin/AdmissionCard'));
+const FeeCard = L(() => import('./pages/admin/FeeCard'));
 const Promotion = L(() => import('./pages/admin/Promotion'));
 const Enquiries = L(() => import('./pages/admin/Enquiries'));
 const Teachers = L(() => import('./pages/admin/Teachers'));
@@ -97,6 +99,8 @@ export default function App() {
           <Route path="students/new" element={<StudentForm />} />
           <Route path="students/:id" element={<StudentProfile />} />
           <Route path="students/:id/edit" element={<StudentForm />} />
+          <Route path="students/:id/admission-card" element={<AdmissionCard />} />
+          <Route path="students/:id/fee-card" element={<FeeCard />} />
           <Route path="promotion" element={<Promotion />} />
           <Route path="enquiries" element={<Enquiries />} />
           <Route path="teachers" element={<Teachers />} />

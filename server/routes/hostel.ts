@@ -36,6 +36,32 @@ hostelRouter.put('/:id', ah(async (req, res) => {
   res.json(h);
 }));
 
+hostelRouter.delete('/:id', ah(async (req, res) => {
+  const hid = id.parse(req.params.id);
+  await tx(async (c) => {
+    const used = await one('SELECT 1 FROM hostel_allocations a JOIN hostel_rooms r ON r.id = a.room_id WHERE r.hostel_id=$1 LIMIT 1', [hid], c);
+    if (used) throw badRequest('Students have stayed in this hostel, so it cannot be deleted. Mark it inactive instead.');
+    await c.query('DELETE FROM hostel_beds WHERE room_id IN (SELECT id FROM hostel_rooms WHERE hostel_id=$1)', [hid]);
+    await c.query('DELETE FROM hostel_rooms WHERE hostel_id=$1', [hid]);
+    const r = await one('DELETE FROM hostels WHERE id=$1 RETURNING name', [hid], c);
+    if (!r) throw notFound();
+    await audit(req, 'hostel.delete', 'hostel', hid, r, c);
+  });
+  res.json({ ok: true });
+}));
+hostelRouter.delete('/rooms/:roomId', ah(async (req, res) => {
+  const rid = id.parse(req.params.roomId);
+  await tx(async (c) => {
+    const used = await one('SELECT 1 FROM hostel_allocations WHERE room_id=$1 LIMIT 1', [rid], c);
+    if (used) throw badRequest('Students have stayed in this room, so it cannot be deleted. Mark it inactive instead.');
+    await c.query('DELETE FROM hostel_beds WHERE room_id=$1', [rid]);
+    const r = await one('DELETE FROM hostel_rooms WHERE id=$1 RETURNING room_no', [rid], c);
+    if (!r) throw notFound();
+    await audit(req, 'hostel_room.delete', 'hostel_room', rid, r, c);
+  });
+  res.json({ ok: true });
+}));
+
 hostelRouter.get('/:id/rooms', ah(async (req, res) => {
   const hid = id.parse(req.params.id);
   const rooms = await q(`SELECT r.* FROM hostel_rooms r WHERE r.hostel_id = $1 ORDER BY r.floor NULLS FIRST, r.room_no`, [hid]);

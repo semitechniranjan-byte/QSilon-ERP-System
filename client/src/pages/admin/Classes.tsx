@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Plus } from 'lucide-react';
-import { Async, Badge, Card, Field, Modal, PageHeader, Tabs, useAction, useApi } from '../../components/ui';
+import { Async, Badge, Card, DeleteButton, Field, Modal, PageHeader, Tabs, useAction, useApi, useUi } from '../../components/ui';
 import { DataTable } from '../../components/DataTable';
 import { api } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
@@ -28,6 +28,7 @@ function Sections() {
   const teachers = useApi<any[]>('/api/teachers');
   const [edit, setEdit] = useState<any>(null);
   const { run, busy, fieldErrors } = useAction();
+  const { confirm } = useUi();
   return (
     <Card bodyClass="p-0">
       {!current && <p className="p-4 text-sm text-amber-700">Create an academic year in Settings first.</p>}
@@ -44,7 +45,8 @@ function Sections() {
             { key: 'class_teacher_name', header: 'Class teacher' },
             { key: 'student_count', header: t('Students'), className: 'text-right', render: (r) => `${r.student_count}${r.capacity ? ` / ${r.capacity}` : ''}`, sortValue: (r) => r.student_count },
             { key: 'room', header: 'Room' },
-            { key: 'e', header: '', sortable: false, render: (r) => <button className="link" onClick={() => setEdit({ id: r.id, name: r.name, boardId: r.board_id ?? '', mediumId: r.medium_id ?? '', classTeacherId: r.class_teacher_id ?? '', capacity: r.capacity ?? '', room: r.room ?? '', isActive: r.is_active })}>{t('Edit')}</button> },
+            { key: 'roll', header: 'Roll numbers', sortable: false, render: (r) => r.student_count > 0 && <button className="link text-xs" onClick={async () => { if (await confirm({ title: `Roll numbers – ${r.class_name} ${r.name}`, message: 'Re-number all students 1, 2, 3… in alphabetical order of name? The change is recorded in the audit log.' })) run(() => api.post(`/api/academics/sections/${r.id}/renumber`, { order: 'alphabetical' }), { success: 'Roll numbers updated alphabetically.' }); }}>A–Z re-number</button> },
+            { key: 'e', header: '', sortable: false, render: (r) => <span className="flex gap-3"><button className="link" onClick={() => setEdit({ id: r.id, name: r.name, boardId: r.board_id ?? '', mediumId: r.medium_id ?? '', classTeacherId: r.class_teacher_id ?? '', capacity: r.capacity ?? '', room: r.room ?? '', isActive: r.is_active })}>{t('Edit')}</button><DeleteButton url={`/api/academics/sections/${r.id}`} what={`Section ${r.class_name} – ${r.name}`} /></span> },
           ]} />
       )}
       {edit && (
@@ -102,7 +104,7 @@ function Levels() {
       {lk && <DataTable rows={lk.classes} toolbar={<button className="btn-primary" onClick={() => setEdit({ name: '', nameHi: '', code: '', sortOrder: (lk.classes.at(-1)?.sort_order ?? 0) + 1, isPreschool: false, isActive: true })}><Plus className="h-4 w-4" />Class level</button>}
         columns={[{ key: 'sort_order', header: 'Order' }, { key: 'name', header: 'Name' }, { key: 'name_hi', header: 'Hindi name' }, { key: 'code', header: 'Code' },
           { key: 'p', header: 'Type', render: (r) => r.is_preschool ? <Badge tone="amber">Preschool</Badge> : 'School' }, { key: 'a', header: 'Active', render: (r) => (r.is_active ? 'Yes' : 'No') },
-          { key: 'e', header: '', sortable: false, render: (r) => <button className="link" onClick={() => setEdit({ id: r.id, name: r.name, nameHi: r.name_hi ?? '', code: r.code, sortOrder: r.sort_order, isPreschool: r.is_preschool, isActive: r.is_active })}>Edit</button> }]} />}
+          { key: 'e', header: '', sortable: false, render: (r) => <span className="flex gap-3"><button className="link" onClick={() => setEdit({ id: r.id, name: r.name, nameHi: r.name_hi ?? '', code: r.code, sortOrder: r.sort_order, isPreschool: r.is_preschool, isActive: r.is_active })}>Edit</button><DeleteButton url={`/api/settings/classes/${r.id}`} what={`Class "${r.name}"`} /></span> }]} />}
       {edit && (
         <Modal open onClose={() => setEdit(null)} title={edit.id ? 'Edit class level' : 'New class level'} footer={<><button className="btn-secondary" onClick={() => setEdit(null)}>Cancel</button>
           <button className="btn-primary" disabled={busy} onClick={async () => { if (await run(() => (edit.id ? api.put(`/api/settings/classes/${edit.id}`, edit) : api.post('/api/settings/classes', edit)))) setEdit(null); }}>Save</button></>}>

@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Trash2 } from 'lucide-react';
-import { Async, Card, Field, Modal, PageHeader, StatusBadge, useAction, useApi, useUi } from '../../components/ui';
+import { Async, Card, DeleteButton, Field, Modal, PageHeader, StatusBadge, useAction, useApi, useUi } from '../../components/ui';
 import { CredentialsModal, SetPasswordModal } from '../../components/Credentials';
 import { TeacherFields } from './Teachers';
 import { api } from '../../lib/api';
@@ -11,6 +11,7 @@ import { fmtDate, fmtDateTime, fullName } from '../../lib/format';
 
 export default function TeacherProfile() {
   const { id } = useParams();
+  const nav = useNavigate();
   const { t } = useI18n();
   const q = useApi<any>(`/api/teachers/${id}`);
   const { confirm } = useUi();
@@ -28,6 +29,7 @@ export default function TeacherProfile() {
               qualification: tch.qualification ?? '', experienceYears: tch.experience_years ?? '', designation: tch.designation ?? '', joiningDate: tch.joining_date ?? '', photoFileId: tch.photo_file_id })}>{t('Edit')}</button>
             <button className="btn-secondary" onClick={() => setSetPw(true)}>Set password</button>
             <button className="btn-secondary" onClick={async () => { if (await confirm({ title: 'Reset password', message: 'Issue a new temporary password? The teacher will be signed out.' })) { const r = await run(() => api.post(`/api/teachers/${id}/reset-password`), { success: false }); if (r) setCreds({ ...r, name: fullName(tch) }); } }}>Temporary password</button>
+            <DeleteButton className="btn-ghost text-red-600" url={`/api/teachers/${id}`} what={`Teacher ${fullName(tch)}`} onDone={() => nav('/admin/teachers')} />
             {tch.status === 'active'
               ? <button className="btn-danger" onClick={async () => { if (await confirm({ title: 'Deactivate teacher', message: 'The teacher will be signed out and unable to log in. Records are preserved.', danger: true })) run(() => api.post(`/api/teachers/${id}/status`, { status: 'inactive' })); }}>Deactivate</button>
               : <button className="btn-primary" onClick={() => run(() => api.post(`/api/teachers/${id}/status`, { status: 'active' }))}>Activate</button>}

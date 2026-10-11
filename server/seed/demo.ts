@@ -257,9 +257,10 @@ export async function seedDemo(opts: { password?: string | null; actorUserId?: n
         const hostel = classNo(code) >= 6 && i === 1; // hosteller; everyone else is a day scholar (school 9 to 4, then home)
         const transport = !hostel && routes.length > 0 && rand() < 0.4;
         const secRow = await one('SELECT class_level_id FROM sections WHERE id=$1', [sectionIds[key]], c);
+        const roll = (await one('SELECT coalesce(max(roll_no), 0) + 1 AS n FROM enrollments WHERE section_id = $1', [sectionIds[key]], c)).n;
         const e = await one(`INSERT INTO enrollments (student_id, academic_year_id, section_id, class_level_id, roll_no, residency, transport_opted, transport_route_id, enrolled_on)
                              VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,
-          [st.id, Y, sectionIds[key], secRow.class_level_id, i, hostel ? 'hostel' : 'day_scholar', transport, transport ? pick(routes) : null, yearRow.start_date], c);
+          [st.id, Y, sectionIds[key], secRow.class_level_id, roll, hostel ? 'hostel' : 'day_scholar', transport, transport ? pick(routes) : null, yearRow.start_date], c);
         await assignPlan(c as PoolClient, e.id, plans[code], null);
         if (hostel) {
           await assignPlan(c as PoolClient, e.id, plans.hostel, null);

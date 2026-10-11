@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Plus } from 'lucide-react';
-import { Async, Badge, Card, Field, Modal, PageHeader, useAction, useApi } from '../../../components/ui';
+import { Async, Badge, Card, DeleteButton, Field, Modal, PageHeader, useAction, useApi } from '../../../components/ui';
 import { DataTable } from '../../../components/DataTable';
 import { api } from '../../../lib/api';
 import { useI18n } from '../../../lib/i18n';
@@ -24,6 +24,7 @@ export default function Transport() {
             { key: 'vehicle_no', header: 'Vehicle' }, { key: 'driver', header: 'Driver', render: (r) => [r.driver_name, r.driver_phone].filter(Boolean).join(' · ') || '—' },
             { key: 'monthly_fee_paise', header: 'Monthly fee', className: 'text-right', render: (r) => inr(r.monthly_fee_paise) },
             { key: 'riders', header: 'Students', className: 'text-right', render: (r) => <button className="link" onClick={() => setRiders(r)}>{r.riders}</button> },
+            { key: 'd', header: '', sortable: false, render: (r) => <DeleteButton url={`/api/fees/routes/${r.id}`} what={`Route "${r.name}"`} /> },
             { key: 'e', header: '', sortable: false, render: (r) => <button className="link" onClick={() => setEdit({ id: r.id, name: r.name, description: r.description ?? '', stops: r.stops ?? '', vehicleNo: r.vehicle_no ?? '', driverName: r.driver_name ?? '', driverPhone: r.driver_phone ?? '', monthlyFee: paiseToRupeeStr(r.monthly_fee_paise), isActive: r.is_active })}>{t('Edit')}</button> },
           ]} />
         )}</Async>

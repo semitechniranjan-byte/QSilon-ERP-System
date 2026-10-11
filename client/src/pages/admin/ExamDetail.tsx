@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Plus, Trash2 } from 'lucide-react';
-import { Async, Card, Modal, PageHeader, StatusBadge, Tabs, useAction, useApi, useUi } from '../../components/ui';
+import { Async, Card, DeleteButton, Modal, PageHeader, StatusBadge, Tabs, useAction, useApi, useUi } from '../../components/ui';
 import { api } from '../../lib/api';
 import { useLookups } from '../../lib/lookups';
 import { fmtDate, fmtDateTime } from '../../lib/format';
@@ -9,6 +9,7 @@ import { ExamFields } from './Exams';
 
 export default function ExamDetail() {
   const { id } = useParams();
+  const nav = useNavigate();
   const q = useApi<any>(`/api/exams/${id}`);
   const [tab, setTab] = useState<'schedule' | 'review' | 'results'>('schedule');
   const { confirm } = useUi();
@@ -20,6 +21,7 @@ export default function ExamDetail() {
       <>
         <PageHeader back="/admin/exams" title={x.name} subtitle={<span className="flex flex-wrap items-center gap-2">{x.exam_type.replace('_', ' ')} · {x.assessment_mode} · {fmtDate(x.start_date)} – {fmtDate(x.end_date)} <StatusBadge status={x.status} />{x.published_at && <span className="text-xs">published {fmtDateTime(x.published_at)}</span>}</span>}
           actions={<>
+            {x.status === 'draft' && <DeleteButton className="btn-ghost text-red-600" url={`/api/exams/${id}`} what={`Exam "${x.name}"`} onDone={() => nav('/admin/exams')} />}
             {x.status !== 'published' && <button className="btn-secondary" onClick={() => setEdit({ name: x.name, examType: x.exam_type, assessmentMode: x.assessment_mode, termId: x.term_id ?? '', gradingScaleId: x.grading_scale_id ?? '', passPercent: x.pass_percent, startDate: x.start_date ?? '', endDate: x.end_date ?? '', academicYearId: x.academic_year_id })}>Edit</button>}
             {x.status !== 'published' && <button className="btn-secondary" onClick={() => run(() => api.post(`/api/exams/${id}/status`, { schedulePublished: !x.schedule_published }))}>{x.schedule_published ? 'Hide schedule' : 'Publish schedule'}</button>}
             {x.status === 'draft' && <button className="btn-primary" onClick={() => run(() => api.post(`/api/exams/${id}/status`, { status: 'marks_entry' }), { success: 'Marks entry opened for teachers.' })}>Open marks entry</button>}

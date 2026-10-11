@@ -31,15 +31,41 @@ export function runs(text: string): { dev: boolean; s: string }[] {
   return out;
 }
 
-/** Draw mixed-script text. Options are passed to pdfkit's text(). */
+/**
+ * Draw mixed-script text. Single-line mixed text is laid out run by run with measured widths so that
+ * right/center alignment works; longer mixed text falls back to flowing runs left-aligned.
+ */
 export function mtext(doc: PDFKit.PDFDocument, text: string, x: number | undefined, y: number | undefined, opts: PDFKit.Mixins.TextOptions & { bold?: boolean } = {}) {
-  const parts = runs(text || '');
-  if (!parts.length) parts.push({ dev: false, s: ' ' });
+  const parts = runs(text || ' ');
   const { bold, ...o } = opts;
+  const fontOf = (dev: boolean) => (dev ? (bold ? 'DB' : 'D') : bold ? 'LB' : 'L');
+  if (parts.length === 1) {
+    doc.font(fontOf(parts[0].dev));
+    if (x !== undefined) doc.text(parts[0].s, x, y, o); else doc.text(parts[0].s, o);
+    return;
+  }
+  const startX = x ?? doc.x;
+  const startY = y ?? doc.y;
+  const widths = parts.map((p) => { doc.font(fontOf(p.dev)); return doc.widthOfString(p.s); });
+  const total = widths.reduce((a, b) => a + b, 0);
+  const box = o.width ?? doc.page.width - doc.page.margins.right - startX;
+  if (total <= box && !text.includes('\n')) {
+    let cx = startX + (o.align === 'right' ? box - total : o.align === 'center' ? (box - total) / 2 : 0);
+    let lineH = 0;
+    parts.forEach((p, i) => {
+      doc.font(fontOf(p.dev));
+      doc.text(p.s, cx, startY, { lineBreak: false });
+      lineH = Math.max(lineH, doc.currentLineHeight(true));
+      cx += widths[i];
+    });
+    doc.x = startX;
+    doc.y = startY + lineH;
+    return;
+  }
   parts.forEach((p, i) => {
-    doc.font(p.dev ? (bold ? 'DB' : 'D') : bold ? 'LB' : 'L');
+    doc.font(fontOf(p.dev));
     const last = i === parts.length - 1;
-    if (i === 0 && x !== undefined) doc.text(p.s, x, y, { ...o, continued: !last });
-    else doc.text(p.s, { ...o, continued: !last });
+    if (i === 0) doc.text(p.s, startX, startY, { ...o, align: 'left', continued: !last });
+    else doc.text(p.s, { ...o, align: 'left', continued: !last });
   });
 }

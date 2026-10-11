@@ -44,7 +44,7 @@ const HI: Record<string, string> = {
   'Mark attendance': 'उपस्थिति दर्ज करें', 'Record payment': 'भुगतान दर्ज करें', 'Report card': 'प्रगति पत्र', 'Grade': 'ग्रेड', 'Marks': 'अंक',
   'Percentage': 'प्रतिशत', 'Remarks': 'टिप्पणी', 'Max marks': 'पूर्णांक', 'Due date': 'अंतिम तिथि', 'Submitted': 'जमा किया', 'Pending': 'लंबित', 'Completed': 'पूर्ण',
   'Start quiz': 'क्विज़ शुरू करें', 'Time left': 'शेष समय', 'Fee statement': 'शुल्क विवरण', 'Payment history': 'भुगतान इतिहास',
-  'Request correction': 'सुधार का अनुरोध', 'Hindi': 'हिन्दी', 'English': 'English',
+  'Request correction': 'सुधार का अनुरोध', 'People': 'लोग', 'Finance': 'वित्त', 'Campus': 'परिसर', 'Administration': 'प्रशासन', 'Teaching': 'शिक्षण', 'More': 'अधिक', 'Teacher ID': 'शिक्षक आईडी', 'Hindi': 'हिन्दी', 'English': 'English',
 };
 
 interface I18n { lang: Lang; setLang: (l: Lang) => void; t: (s: string) => string; pick: (en?: string | null, hi?: string | null) => string }

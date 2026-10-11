@@ -1,7 +1,8 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowRight, Award, Baby, BedDouble, BookOpen, Bus, CalendarDays, Clock, FlaskConical, GraduationCap, HeartHandshake, Languages, Library, Mail, MapPin,
-  Megaphone, Monitor, Music, Palette, Phone, Shield, Star, Trophy, Users,
+  Camera, ChevronLeft, ChevronRight, Megaphone, Monitor, Music, Palette, Phone, Shield, Star, Trophy, Users,
 } from 'lucide-react';
 import { useI18n } from '../../lib/i18n';
 import { usePublicSite } from '../../components/PublicLayout';
@@ -16,6 +17,49 @@ export function Paragraphs({ text, className = '' }: { text?: string | null; cla
   if (!text) return null;
   return <div className={`space-y-3 ${className}`}>{text.split(/\n\s*\n/).map((p, i) => <p key={i} className="whitespace-pre-line">{p}</p>)}</div>;
 }
+/** Hero visual: rotating school photos (homepage image + gallery), or an illustrated campus until photos are uploaded. */
+function HeroVisual({ photos, initials, caption }: { photos: { id: number; title: string }[]; initials: string; caption: string }) {
+  const { lang } = useI18n();
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    if (photos.length < 2) return;
+    const h = setInterval(() => setI((x) => (x + 1) % photos.length), 5000);
+    return () => clearInterval(h);
+  }, [photos.length]);
+  if (!photos.length) {
+    return (
+      <div className="relative mx-auto w-full max-w-xl">
+        <div className="absolute -inset-3 rotate-2 rounded-[2rem] bg-accent-400/80" aria-hidden />
+        <SchoolIllustration initials={initials} className="relative w-full rounded-[1.75rem] shadow-2xl ring-4 ring-white/20" />
+        <div className="absolute -bottom-5 left-3 flex items-center sm:-left-5 gap-3 rounded-2xl bg-white px-4 py-3 text-slate-800 shadow-xl">
+          <div className="rounded-xl bg-accent-400/20 p-2 text-accent-600"><GraduationCap className="h-5 w-5" /></div>
+          <div><p className="text-sm font-semibold leading-tight">{caption}</p><p className="text-xs text-slate-500">{lang === 'hi' ? 'दैनिक विद्यार्थी एवं छात्रावासी' : 'Day scholars & hostellers'}</p></div>
+        </div>
+      </div>
+    );
+  }
+  const go = (d: number) => setI((x) => (x + d + photos.length) % photos.length);
+  return (
+    <div className="relative mx-auto w-full max-w-xl">
+      <div className="absolute -inset-3 rotate-2 rounded-[2rem] bg-accent-400/80" aria-hidden />
+      <div className="relative aspect-[4/3] overflow-hidden rounded-[1.75rem] shadow-2xl ring-4 ring-white/20">
+        {photos.map((p, k) => (
+          <img key={p.id} src={`/api/files/${p.id}`} alt={p.title} loading={k ? 'lazy' : 'eager'}
+            className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-1000 ${k === i ? 'opacity-100' : 'opacity-0'}`} />
+        ))}
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-4 pt-10">
+          <p className="text-sm font-medium text-white">{photos[i].title}</p>
+        </div>
+        {photos.length > 1 && <>
+          <button type="button" onClick={() => go(-1)} aria-label="Previous photo" className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-white/80 p-1.5 text-slate-800 hover:bg-white"><ChevronLeft className="h-5 w-5" /></button>
+          <button type="button" onClick={() => go(1)} aria-label="Next photo" className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-white/80 p-1.5 text-slate-800 hover:bg-white"><ChevronRight className="h-5 w-5" /></button>
+          <div className="absolute bottom-3 right-4 flex gap-1.5">{photos.map((p, k) => <button type="button" key={p.id} onClick={() => setI(k)} aria-label={`Photo ${k + 1}`} className={`h-2 rounded-full transition-all ${k === i ? 'w-6 bg-white' : 'w-2 bg-white/60'}`} />)}</div>
+        </>}
+      </div>
+    </div>
+  );
+}
+
 const firstPara = (t?: string | null) => (t ?? '').split(/\n\s*\n/)[0];
 
 export default function Home() {
@@ -23,7 +67,7 @@ export default function Home() {
   const q = usePublicSite();
   if (q.isLoading) return <Loading />;
   if (q.error || !q.data) return <div className="p-8"><ErrorState error={q.error} /></div>;
-  const { school: s, stats, facilities, notices, events, classes, boards, mediums, routes, hostels, pages } = q.data;
+  const { school: s, stats, facilities, gallery, notices, events, classes, boards, mediums, routes, hostels, pages } = q.data;
   const page = (k: string) => pages.find((p) => p.key === k);
   const pageText = (k: string) => { const p = page(k); return p ? pick(p.body, p.body_hi) : ''; };
   const preschool = classes.filter((c) => c.is_preschool);
@@ -33,6 +77,11 @@ export default function Home() {
     [t('Classes offered'), stats.classes, BookOpen], [t('Years of excellence'), stats.yearsExperience, Trophy],
   ] : []).filter(([, v]) => v != null && Number(v) > 0) as [string, number, any][];
   const name = pick(s.name, s.nameHi);
+  const initials = (s.name ?? '').split(/\s+/).filter(Boolean).map((w: string) => w[0]).join('').toUpperCase().slice(0, 5);
+  const photos = [
+    ...(s.heroImageFileId ? [{ id: s.heroImageFileId, title: name }] : []),
+    ...(gallery ?? []).filter((g: any) => g.file_id !== s.heroImageFileId).map((g: any) => ({ id: g.file_id, title: pick(g.title, g.title_hi) })),
+  ].slice(0, 6);
   const range = classes.length ? `${pick(classes[0].name, classes[0].name_hi)} – ${pick(classes[classes.length - 1].name, classes[classes.length - 1].name_hi)}` : '';
   const rangeTo = classes.length ? (lang === 'hi' ? `${pick(classes[0].name, classes[0].name_hi)} से ${pick(classes[classes.length - 1].name, classes[classes.length - 1].name_hi)} तक` : `${classes[0].name} to ${classes[classes.length - 1].name}`) : '';
   const hours = pick(s.schoolHours, s.schoolHoursHi);
@@ -46,29 +95,31 @@ export default function Home() {
     <>
       {/* Hero */}
       <section className="relative overflow-hidden bg-brand-800 text-white">
-        {s.heroImageFileId && <img src={`/api/files/${s.heroImageFileId}`} alt="" className="absolute inset-0 h-full w-full object-cover opacity-30" />}
         <div className="absolute inset-0 bg-gradient-to-br from-brand-900 via-brand-800/95 to-brand-600/80" />
         <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-accent-400/20 blur-3xl" aria-hidden />
         <div className="absolute -bottom-32 left-10 h-72 w-72 rounded-full bg-brand-400/30 blur-3xl" aria-hidden />
-        <div className="relative mx-auto grid max-w-7xl items-center gap-10 px-4 py-14 sm:py-20 lg:grid-cols-2">
+        <div className="relative mx-auto grid max-w-7xl items-center gap-10 px-4 py-14 sm:py-20 lg:grid-cols-2 lg:gap-16">
           <div>
             <p className="mb-4 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-accent-400 ring-1 ring-white/20">
               <Star className="h-3.5 w-3.5" />{lang === 'hi' ? `प्रवेश प्रारंभ · ${rangeTo}` : `Admissions open · ${rangeTo}`}</p>
-            <h1 className="text-3xl font-bold leading-tight sm:text-5xl">{name}</h1>
+            <h1 className="text-4xl font-extrabold leading-tight tracking-tight sm:text-5xl xl:text-6xl">{name}</h1>
             {s.tagline && <p className="mt-4 max-w-xl text-lg text-brand-100">{pick(s.tagline, s.taglineHi)}</p>}
             <div className="mt-8 flex flex-wrap gap-3">
               <Link to="/admission" className="btn bg-accent-500 px-5 py-2.5 text-brand-900 hover:bg-accent-400">{t('Apply for Admission')} <ArrowRight className="h-4 w-4" /></Link>
               <Link to="/about" className="btn border border-white/40 px-5 py-2.5 text-white hover:bg-white/10">{t('Read more')}</Link>
             </div>
             {statItems.length > 0 && (
-              <dl className="mt-10 grid max-w-lg grid-cols-2 gap-4 sm:grid-cols-4">
-                {statItems.map(([label, value]) => (
-                  <div key={label}><dt className="order-2 text-xs text-brand-200">{label}</dt><dd className="text-2xl font-bold text-white">{value}{label === t('Years of excellence') ? '+' : ''}</dd></div>
+              <dl className="mt-10 flex max-w-xl flex-wrap gap-3">
+                {statItems.map(([label, value, Icon]) => (
+                  <div key={label} className="flex min-w-[9rem] flex-1 items-center gap-3 rounded-2xl bg-white/10 px-4 py-3 ring-1 ring-white/15 backdrop-blur">
+                    <Icon className="h-6 w-6 shrink-0 text-accent-400" />
+                    <div><dd className="text-2xl font-bold leading-none text-white">{value}{label === t('Years of excellence') ? '+' : ''}</dd><dt className="mt-1 text-xs text-brand-100">{label}</dt></div>
+                  </div>
                 ))}
               </dl>
             )}
           </div>
-          <div className="hidden lg:block"><SchoolIllustration className="mx-auto w-full max-w-lg drop-shadow-2xl" /></div>
+          <div className="pb-6 lg:pb-0"><HeroVisual photos={photos} initials={initials} caption={rangeTo} /></div>
         </div>
       </section>
 
@@ -145,8 +196,29 @@ export default function Home() {
         </section>
       )}
 
+      {/* Campus photos */}
+      {(gallery ?? []).length > 0 && (
+        <section className="bg-slate-50 py-16">
+          <div className="mx-auto max-w-7xl px-4">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div><p className="text-sm font-semibold uppercase tracking-wider text-accent-600">{t('Gallery')}</p>
+                <h2 className="mt-1 text-2xl font-semibold text-brand-900 sm:text-3xl">{lang === 'hi' ? 'विद्यालय की झलक' : 'Life at our campus'}</h2></div>
+              <Link to="/gallery" className="link inline-flex items-center gap-1"><Camera className="h-4 w-4" />{lang === 'hi' ? 'सभी फ़ोटो' : 'View all photos'}</Link>
+            </div>
+            <div className="mt-8 grid auto-rows-[10rem] grid-cols-2 gap-3 sm:auto-rows-[12rem] md:grid-cols-4">
+              {(gallery ?? []).slice(0, 7).map((g: any, k: number) => (
+                <Link to="/gallery" key={g.id} className={`group relative overflow-hidden rounded-2xl bg-slate-200 ${k === 0 ? 'col-span-2 row-span-2' : ''}`}>
+                  <img src={`/api/files/${g.file_id}`} alt={pick(g.title, g.title_hi)} loading="lazy" className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+                  <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-3 text-sm font-medium text-white opacity-0 transition group-hover:opacity-100">{pick(g.title, g.title_hi)}</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* Admissions CTA */}
-      <section className="mx-auto max-w-7xl px-4 pb-4">
+      <section className="mx-auto max-w-7xl px-4 py-12">
         <div className="flex flex-col items-start justify-between gap-4 rounded-2xl bg-gradient-to-r from-accent-500 to-accent-400 p-8 text-brand-900 sm:flex-row sm:items-center">
           <div><h2 className="text-2xl font-bold">{lang === 'hi' ? 'नए सत्र के लिए प्रवेश प्रारंभ' : 'Admissions are open for the new session'}</h2>
             <p className="mt-1 text-brand-900/80">{lang === 'hi' ? `${rangeTo} — दैनिक विद्यार्थी एवं छात्रावास, आज ही पूछताछ करें।` : `${rangeTo} · day scholars and hostel residents — send an enquiry and we will call you back.`}</p></div>

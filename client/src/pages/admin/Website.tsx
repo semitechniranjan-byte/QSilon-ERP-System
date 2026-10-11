@@ -74,6 +74,7 @@ function Gallery() {
   return (
     <Card title={<div className="flex flex-wrap items-center gap-2"><input className="input w-64" placeholder="Caption for the next photo" value={title} onChange={(e) => setTitle(e.target.value)} />
       <FileInput purpose="gallery" accept="image/jpeg,image/png,image/webp" label="Upload photo" onUploaded={(f) => { run(() => api.post('/api/settings/website/gallery', { title: title || f.name, fileId: f.id, isPublished: true })); setTitle(''); }} /></div>}>
+      <p className="mb-1 text-sm text-slate-600">Photos uploaded here appear on the home page: the newest 6 rotate in the top slideshow and also show in the “Life at our campus” section. Wide (landscape) photos of the building, classrooms, labs, sports and events look best.</p>
       <p className="mb-3 text-xs text-slate-500">Do not upload photos that identify children without parental consent.</p>
       <Async q={q}>{(rows) => (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">{rows.map((g) => (

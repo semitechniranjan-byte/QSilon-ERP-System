@@ -33,11 +33,13 @@ export default function Home() {
     [t('Classes offered'), stats.classes, BookOpen], [t('Years of excellence'), stats.yearsExperience, Trophy],
   ] : []).filter(([, v]) => v != null && Number(v) > 0) as [string, number, any][];
   const name = pick(s.name, s.nameHi);
+  const range = classes.length ? `${pick(classes[0].name, classes[0].name_hi)} – ${pick(classes[classes.length - 1].name, classes[classes.length - 1].name_hi)}` : '';
+  const rangeTo = classes.length ? (lang === 'hi' ? `${pick(classes[0].name, classes[0].name_hi)} से ${pick(classes[classes.length - 1].name, classes[classes.length - 1].name_hi)} तक` : `${classes[0].name} to ${classes[classes.length - 1].name}`) : '';
   const hours = pick(s.schoolHours, s.schoolHoursHi);
   const highlights = [
     [Award, boards.map((b) => b.code).join(' & ') || 'CBSE', lang === 'hi' ? 'मान्यता प्राप्त पाठ्यक्रम' : 'Recognised curriculum'],
     [Languages, mediums.map((m) => m.name).join(' & ') || 'English', lang === 'hi' ? 'शिक्षण माध्यम' : 'Medium of instruction'],
-    [Baby, lang === 'hi' ? 'प्ले ग्रुप – 12' : 'Playgroup – 12', lang === 'hi' ? 'सभी कक्षाएँ' : 'All classes under one roof'],
+    [BookOpen, range, lang === 'hi' ? 'सभी कक्षाएँ' : 'All classes under one roof'],
     [Clock, hours || '9:00 – 4:00', lang === 'hi' ? 'विद्यालय समय' : 'School timings'],
   ] as [any, string, string][];
   return (
@@ -51,7 +53,7 @@ export default function Home() {
         <div className="relative mx-auto grid max-w-7xl items-center gap-10 px-4 py-14 sm:py-20 lg:grid-cols-2">
           <div>
             <p className="mb-4 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-accent-400 ring-1 ring-white/20">
-              <Star className="h-3.5 w-3.5" />{lang === 'hi' ? 'प्रवेश प्रारंभ · प्ले ग्रुप से कक्षा 12' : 'Admissions open · Playgroup to Class 12'}</p>
+              <Star className="h-3.5 w-3.5" />{lang === 'hi' ? `प्रवेश प्रारंभ · ${rangeTo}` : `Admissions open · ${rangeTo}`}</p>
             <h1 className="text-3xl font-bold leading-tight sm:text-5xl">{name}</h1>
             {s.tagline && <p className="mt-4 max-w-xl text-lg text-brand-100">{pick(s.tagline, s.taglineHi)}</p>}
             <div className="mt-8 flex flex-wrap gap-3">
@@ -76,7 +78,7 @@ export default function Home() {
           {highlights.map(([Icon, title, sub]) => (
             <div key={sub} className="flex items-center gap-3 bg-white p-4 sm:p-5">
               <div className="rounded-xl bg-brand-50 p-2.5 text-brand-600"><Icon className="h-5 w-5" /></div>
-              <div className="min-w-0"><p className="font-semibold text-slate-900">{title}</p><p className="text-xs text-slate-500">{sub}</p></div>
+              <div className="min-w-0"><p className="text-sm font-semibold leading-snug text-slate-900">{title}</p><p className="text-xs text-slate-500">{sub}</p></div>
             </div>
           ))}
         </div>
@@ -109,11 +111,12 @@ export default function Home() {
           <h2 className="mt-1 text-2xl font-semibold text-brand-900 sm:text-3xl">{lang === 'hi' ? 'हमारे कार्यक्रम' : 'Our programmes'}</h2>
           <div className="mt-8 grid gap-6 md:grid-cols-3">
             {[
-              { to: '/preschool', Icon: Baby, color: 'text-accent-500 bg-accent-400/15', title: t('Preschool'), sub: preschool.map((c) => pick(c.name, c.name_hi)).join(' · '), text: firstPara(pageText('preschool')) },
-              { to: '/academics', Icon: BookOpen, color: 'text-brand-600 bg-brand-50', title: lang === 'hi' ? 'विद्यालय (कक्षा 1–12)' : 'School (Class 1–12)', sub: school.length ? `${pick(school[0].name, school[0].name_hi)} – ${pick(school[school.length - 1].name, school[school.length - 1].name_hi)}` : '', text: firstPara(pageText('academics')) },
+              ...(preschool.length ? [{ to: '/preschool', Icon: Baby, color: 'text-accent-500 bg-accent-400/15', title: t('Preschool'), sub: preschool.map((c) => pick(c.name, c.name_hi)).join(' · '), text: firstPara(pageText('preschool')) }] : []),
+              { to: '/academics', Icon: BookOpen, color: 'text-brand-600 bg-brand-50', title: lang === 'hi' ? 'शैक्षणिक' : 'Academics', sub: school.length ? `${pick(school[0].name, school[0].name_hi)} – ${pick(school[school.length - 1].name, school[school.length - 1].name_hi)}` : '', text: firstPara(pageText('academics')) },
+              ...(!preschool.length ? [{ to: '/academics', Icon: Clock, color: 'text-emerald-600 bg-emerald-50', title: lang === 'hi' ? 'दैनिक विद्यार्थी' : 'Day Scholars', sub: hours, text: lang === 'hi' ? 'दैनिक विद्यार्थी सुबह से शाम तक विद्यालय में पढ़ाई, खेल और गतिविधियों में भाग लेकर घर लौटते हैं। सुरक्षित बस सुविधा उपलब्ध है।' : 'Day scholars spend the school day learning, playing and taking part in activities, and return home in the evening. Safe school transport is available on major routes.' }] : []),
               { to: '/hostel', Icon: BedDouble, color: 'text-violet-600 bg-violet-50', title: lang === 'hi' ? 'छात्रावास एवं परिवहन' : 'Hostel & Transport', sub: [hostels.length ? `${hostels.length} ${lang === 'hi' ? 'छात्रावास' : 'hostel(s)'}` : '', routes.length ? `${routes.length} ${lang === 'hi' ? 'बस मार्ग' : 'bus routes'}` : ''].filter(Boolean).join(' · '), text: firstPara(pageText('hostel')) || firstPara(pageText('transport')) },
             ].map(({ to, Icon, color, title, sub, text }) => (
-              <Link key={to} to={to} className="group card flex flex-col p-6 transition hover:-translate-y-0.5 hover:shadow-lg">
+              <Link key={title} to={to} className="group card flex flex-col p-6 transition hover:-translate-y-0.5 hover:shadow-lg">
                 <div className={`w-fit rounded-xl p-3 ${color}`}><Icon className="h-6 w-6" /></div>
                 <h3 className="mt-4 text-lg font-semibold">{title}</h3>
                 {sub && <p className="text-sm font-medium text-slate-500">{sub}</p>}
@@ -146,7 +149,7 @@ export default function Home() {
       <section className="mx-auto max-w-7xl px-4 pb-4">
         <div className="flex flex-col items-start justify-between gap-4 rounded-2xl bg-gradient-to-r from-accent-500 to-accent-400 p-8 text-brand-900 sm:flex-row sm:items-center">
           <div><h2 className="text-2xl font-bold">{lang === 'hi' ? 'नए सत्र के लिए प्रवेश प्रारंभ' : 'Admissions are open for the new session'}</h2>
-            <p className="mt-1 text-brand-900/80">{lang === 'hi' ? 'प्ले ग्रुप से कक्षा 12 तक — आज ही पूछताछ करें।' : 'Playgroup to Class 12 — send an enquiry and we will call you back.'}</p></div>
+            <p className="mt-1 text-brand-900/80">{lang === 'hi' ? `${rangeTo} — दैनिक विद्यार्थी एवं छात्रावास, आज ही पूछताछ करें।` : `${rangeTo} · day scholars and hostel residents — send an enquiry and we will call you back.`}</p></div>
           <Link to="/admission" className="btn bg-brand-800 px-5 py-2.5 text-white hover:bg-brand-900">{t('Admission Enquiry')} <ArrowRight className="h-4 w-4" /></Link>
         </div>
       </section>

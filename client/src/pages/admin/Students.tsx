@@ -25,7 +25,7 @@ export default function Students() {
         {can('students.manage') && <Link to="/admin/students/new" className="btn-primary"><Plus className="h-4 w-4" />{t('Admissions')}</Link>}
       </>} />
       <Card bodyClass="p-0">
-        <div className="grid grid-cols-2 gap-2 border-b border-slate-100 p-3 md:grid-cols-6">
+        <div className="grid grid-cols-2 gap-2 border-b border-slate-100 p-3 md:grid-cols-5">
           <select className="input" value={f.yearId} onChange={(e) => set('yearId', e.target.value)} aria-label={t('Academic Year')}>
             <option value="">{current?.name ?? t('Academic Year')}</option>{lk?.years.filter((y) => !y.is_current).map((y) => <option key={y.id} value={y.id}>{y.name}</option>)}
           </select>
@@ -41,9 +41,9 @@ export default function Students() {
           <select className="input" value={f.transport} onChange={(e) => set('transport', e.target.value)} aria-label={t('Transport')}>
             <option value="">{t('Transport')}: {t('All')}</option><option value="yes">{t('Transport')}: {t('Yes')}</option><option value="no">{t('Transport')}: {t('No')}</option>
           </select>
-          <select className="input" value={f.preschool} onChange={(e) => set('preschool', e.target.value)} aria-label={t('Preschool')}>
+          {lk?.classes.some((c) => c.is_preschool && c.is_active) && <select className="input" value={f.preschool} onChange={(e) => set('preschool', e.target.value)} aria-label={t('Preschool')}>
             <option value="">{t('Preschool')} & school</option><option value="yes">{t('Preschool')}</option><option value="no">School only</option>
-          </select>
+          </select>}
         </div>
         <Async q={q}>{(rows: any[]) => (
           <DataTable rows={rows} onRowClick={(r) => nav(`/admin/students/${r.id}`)}

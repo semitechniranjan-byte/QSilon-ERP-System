@@ -24,7 +24,8 @@ export default function AdminDashboard() {
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
             <StatCard label={t('Total students')} value={d.counts.students} icon={<GraduationCap className="h-5 w-5" />} to="/admin/students" />
             <StatCard label={t('Active teachers')} value={d.counts.teachers} icon={<Users className="h-5 w-5" />} to="/admin/teachers" tone="green" />
-            <StatCard label={t('Preschool enrollment')} value={d.counts.preschool} icon={<Baby className="h-5 w-5" />} tone="amber" />
+            {d.counts.preschool > 0 ? <StatCard label={t('Preschool enrollment')} value={d.counts.preschool} icon={<Baby className="h-5 w-5" />} tone="amber" />
+              : <StatCard label={t('Classes & Sections')} value={d.counts.sections} icon={<Baby className="h-5 w-5" />} tone="amber" to="/admin/classes" />}
             <StatCard label={t('Hostel residents')} value={d.counts.hostel} icon={<BedDouble className="h-5 w-5" />} tone="purple" to="/admin/hostel" />
             <StatCard label={t('Day scholars')} value={d.counts.day_scholars} icon={<Users className="h-5 w-5" />} />
             <StatCard label={t('Transport')} value={d.counts.transport} icon={<Bus className="h-5 w-5" />} tone="green" />

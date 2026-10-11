@@ -50,7 +50,8 @@ describe('demo data', () => {
     const { removeDemo } = await import('../server/seed/demo.js');
     const admin = await new Client(app).login('principal', 'Principal123');
     const seeded = ok(await admin.post('/api/settings/demo', { password: 'demo1234' }));
-    expect(seeded.summary.students).toBeGreaterThan(50);
+    expect(seeded.summary.students).toBeGreaterThanOrEqual(26);
+    expect(seeded.summary.students).toBeLessThanOrEqual(40);
     expect(seeded.summary.payments).toBeGreaterThan(0);
     expect(ok(await admin.get('/api/dashboard/admin')).demoLoaded).toBe(true);
     // Sample accounts use the chosen password; results and fees are visible in the portals.

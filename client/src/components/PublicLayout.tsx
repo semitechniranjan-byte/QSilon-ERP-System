@@ -18,6 +18,18 @@ export function SchoolLogo({ fileId, name, className = 'h-10 w-10' }: { fileId?:
   );
 }
 
+/** Compact two-line school name for the header so long names never squeeze the menu. */
+export function BrandName({ name, className = 'text-brand-800' }: { name: string; className?: string }) {
+  const words = name.split(/\s+/).filter(Boolean);
+  const cut = words.length > 2 ? Math.ceil(words.length / 2) : words.length;
+  const [a, b] = [words.slice(0, cut).join(' '), words.slice(cut).join(' ')];
+  return (
+    <span className={`min-w-0 whitespace-nowrap text-sm font-bold leading-tight ${className}`} title={name}>
+      <span className="block">{a}</span>{b && <span className="block text-xs font-semibold opacity-80">{b}</span>}
+    </span>
+  );
+}
+
 const NAV = [
   ['/', 'Home'], ['/about', 'About Us'], ['/academics', 'Academics'], ['/preschool', 'Preschool'], ['/hostel', 'Hostel'],
   ['/facilities', 'Facilities'], ['/gallery', 'Gallery'], ['/notices', 'Notices'], ['/contact', 'Contact Us'],
@@ -30,17 +42,18 @@ export function PublicLayout({ children }: { children?: ReactNode }) {
   const [open, setOpen] = useState(false);
   const s = data?.school;
   const name = s ? pick(s.name, s.nameHi) : '';
+  const hasPreschool = !!data?.classes.some((c) => c.is_preschool);
+  const nav = NAV.filter(([to]) => to !== '/preschool' || hasPreschool);
   return (
     <div className="flex min-h-screen flex-col bg-white">
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-2.5">
           <Link to="/" className="flex min-w-0 items-center gap-3">
-            {s && <SchoolLogo fileId={s.logoFileId} name={s.name} className="h-11 w-11 shrink-0" />}
-            <span className="min-w-0"><span className="block truncate text-base font-bold leading-tight text-brand-800 sm:text-lg">{name}</span>
-              {s?.tagline && <span className="hidden truncate text-xs text-slate-500 sm:block">{pick(s.tagline, s.taglineHi)}</span>}</span>
+            {s && <SchoolLogo fileId={s.logoFileId} name={s.name} className="h-10 w-10 shrink-0" />}
+            <BrandName name={name} />
           </Link>
           <nav className="hidden items-center gap-0.5 xl:flex" aria-label="Main">
-            {NAV.map(([to, label]) => (
+            {nav.map(([to, label]) => (
               <NavLink key={to} to={to} end={to === '/'} className={({ isActive }) => `whitespace-nowrap rounded-md px-2 py-1.5 text-sm ${isActive ? 'bg-brand-50 font-medium text-brand-700' : 'text-slate-600 hover:text-brand-700'}`}>{t(label)}</NavLink>
             ))}
           </nav>
@@ -54,7 +67,7 @@ export function PublicLayout({ children }: { children?: ReactNode }) {
         {open && (
           <nav className="border-t border-slate-100 px-4 pb-4 xl:hidden" aria-label="Mobile">
             <div className="grid grid-cols-2 gap-1 pt-2">
-              {[...NAV, ['/admission', 'Admission Enquiry'] as const].map(([to, label]) => (
+              {[...nav, ['/admission', 'Admission Enquiry'] as const].map(([to, label]) => (
                 <NavLink key={to} to={to} end={to === '/'} onClick={() => setOpen(false)} className={({ isActive }) => `rounded-md px-3 py-2 text-sm ${isActive ? 'bg-brand-50 font-medium text-brand-700' : 'text-slate-700'}`}>{t(label)}</NavLink>
               ))}
             </div>
@@ -76,7 +89,7 @@ export function PublicLayout({ children }: { children?: ReactNode }) {
             {s?.schoolHours && <p className="flex gap-2"><Clock className="h-4 w-4" />{pick(s.schoolHours, s.schoolHoursHi)}</p>}
           </div>
           <div className="grid grid-cols-2 gap-1 text-sm">
-            {NAV.slice(1).map(([to, label]) => <Link key={to} to={to} className="hover:text-white">{t(label)}</Link>)}
+            {nav.slice(1).map(([to, label]) => <Link key={to} to={to} className="hover:text-white">{t(label)}</Link>)}
             <Link to="/admission" className="hover:text-white">{t('Admission Enquiry')}</Link>
             <Link to="/login" className="hover:text-white">{t('Login')}</Link>
           </div>

@@ -8,7 +8,7 @@ import { useAuth, type User } from '../lib/auth';
 import { useI18n } from '../lib/i18n';
 import { LangToggle } from './LangToggle';
 import { Loading } from './ui';
-import { SchoolLogo } from './PublicLayout';
+import { BrandName, SchoolLogo } from './PublicLayout';
 
 type Item = { to: string; label: string; icon: any; show?: (u: User, can: (p: string) => boolean) => boolean };
 type Group = { label?: string; items: Item[] };
@@ -102,7 +102,7 @@ export function AppLayout({ roles }: { roles: User['role'][] }) {
     <nav className="flex h-full flex-col" aria-label="Sidebar">
       <Link to="/" className="flex items-center gap-2 border-b border-brand-800 px-4 py-4">
         <SchoolLogo fileId={school?.logoFileId} name={school?.name ?? 'S'} className="h-9 w-9" />
-        <span className="line-clamp-2 text-sm font-semibold text-white">{name}</span>
+        <BrandName name={name} className="text-white" />
       </Link>
       <div className="flex-1 space-y-4 overflow-y-auto px-3 py-4">
         {groups.map((g, gi) => (

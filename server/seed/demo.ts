@@ -97,8 +97,8 @@ export async function seedDemo(opts: { password?: string | null; actorUserId?: n
     const TEACHERS: [string, string, string, string, string][] = [
       ['anita', 'Anita', 'Sharma', 'M.A. (English), B.Ed.', 'TGT English'],
       ['rakesh', 'Rakesh', 'Kumar', 'M.Sc. (Mathematics), B.Ed.', 'PGT Mathematics'],
-      ['sunita', 'Sunita', 'Devi', 'NTT, B.A.', 'Pre-primary Teacher'],
-      ['pooja', 'Pooja', 'Mishra', 'B.El.Ed.', 'Pre-primary Teacher'],
+      ['sunita', 'Sunita', 'Devi', 'M.Sc. (Chemistry), B.Ed.', 'PGT Chemistry & Biology'],
+      ['pooja', 'Pooja', 'Mishra', 'B.El.Ed.', 'PRT'],
       ['vikash', 'Vikash', 'Singh', 'M.Sc. (Physics), B.Ed.', 'PGT Science'],
       ['neha', 'Neha', 'Gupta', 'M.A. (Hindi), B.Ed.', 'TGT Hindi'],
       ['amit', 'Amit', 'Jha', 'M.A. (History), B.Ed.', 'TGT Social Science'],
@@ -123,9 +123,9 @@ export async function seedDemo(opts: { password?: string | null; actorUserId?: n
     // ---- Sections
     const SECTIONS: [string, string, string, string, string, string][] = [
       // key, class code, section, board, medium, class teacher
-      ['PG', 'PG', 'A', 'CBSE', 'EN', 'pooja'], ['NUR', 'NUR', 'A', 'CBSE', 'EN', 'sunita'], ['LKG', 'LKG', 'A', 'CBSE', 'EN', 'pooja'], ['UKG', 'UKG', 'A', 'CBSE', 'EN', 'sunita'],
-      ['1A', '1', 'A', 'CBSE', 'EN', 'ritu'], ['3A', '3', 'A', 'CBSE', 'EN', 'neha'], ['5A', '5', 'A', 'CBSE', 'EN', 'anita'], ['5B', '5', 'B', 'BSEB', 'HI', 'neha'],
-      ['8A', '8', 'A', 'CBSE', 'EN', 'amit'], ['10A', '10', 'A', 'CBSE', 'EN', 'rakesh'], ['12A', '12', 'A', 'CBSE', 'EN', 'vikash'],
+      ['NURA', 'NUR', 'A', 'CBSE', 'EN', 'pooja'], ['1A', '1', 'A', 'CBSE', 'EN', 'pooja'], ['2A', '2', 'A', 'CBSE', 'EN', 'pooja'], ['3A', '3', 'A', 'CBSE', 'EN', 'ritu'], ['4A', '4', 'A', 'CBSE', 'EN', 'ritu'],
+      ['5A', '5', 'A', 'CBSE', 'EN', 'anita'], ['6A', '6', 'A', 'CBSE', 'EN', 'neha'], ['7A', '7', 'A', 'BSEB', 'HI', 'amit'], ['8A', '8', 'A', 'CBSE', 'EN', 'deepak'],
+      ['9A', '9', 'A', 'CBSE', 'EN', 'sunita'], ['10A', '10', 'A', 'CBSE', 'EN', 'rakesh'], ['11A', '11', 'A', 'CBSE', 'EN', 'vikash'], ['12A', '12', 'A', 'CBSE', 'EN', 'anita'],
     ];
     for (const [key, code, name, b, m, ct] of SECTIONS) {
       let r = await one('SELECT id FROM sections WHERE academic_year_id=$1 AND class_level_id=$2 AND name=$3', [Y, await cl(code), name], c);
@@ -137,9 +137,10 @@ export async function seedDemo(opts: { password?: string | null; actorUserId?: n
       sectionIds[key] = r.id;
     }
     const CLASS_SUBJECTS: Record<string, string[]> = {
-      PG: ['ENG', 'HIN', 'ACT'], NUR: ['ENG', 'HIN', 'ACT'], LKG: ['ENG', 'HIN', 'MATH', 'ACT'], UKG: ['ENG', 'HIN', 'MATH', 'ACT'],
-      '1': ['ENG', 'HIN', 'MATH', 'EVS'], '3': ['ENG', 'HIN', 'MATH', 'EVS', 'COMP'], '5': ['ENG', 'HIN', 'MATH', 'EVS', 'COMP'],
-      '8': ['ENG', 'HIN', 'MATH', 'SCI', 'SST', 'COMP'], '10': ['ENG', 'HIN', 'MATH', 'SCI', 'SST'], '12': ['ENG', 'PHY', 'CHEM', 'MATH', 'BIO'],
+      NUR: ['ENG', 'HIN', 'MATH'], '1': ['ENG', 'HIN', 'MATH', 'EVS'], '2': ['ENG', 'HIN', 'MATH', 'EVS'], '3': ['ENG', 'HIN', 'MATH', 'EVS', 'COMP'], '4': ['ENG', 'HIN', 'MATH', 'EVS', 'COMP'],
+      '5': ['ENG', 'HIN', 'MATH', 'EVS', 'COMP'], '6': ['ENG', 'HIN', 'MATH', 'SCI', 'SST', 'COMP'], '7': ['ENG', 'HIN', 'MATH', 'SCI', 'SST', 'COMP'],
+      '8': ['ENG', 'HIN', 'MATH', 'SCI', 'SST', 'COMP'], '9': ['ENG', 'HIN', 'MATH', 'SCI', 'SST'], '10': ['ENG', 'HIN', 'MATH', 'SCI', 'SST'],
+      '11': ['ENG', 'PHY', 'CHEM', 'MATH', 'BIO'], '12': ['ENG', 'PHY', 'CHEM', 'MATH', 'BIO'],
     };
     for (const [code, subs] of Object.entries(CLASS_SUBJECTS)) {
       for (const sc of subs) {
@@ -147,14 +148,13 @@ export async function seedDemo(opts: { password?: string | null; actorUserId?: n
         if (r) await reg('class_subjects', r.id);
       }
     }
-    const WHO: Record<string, string> = { ENG: 'anita', HIN: 'neha', MATH: 'rakesh', SCI: 'vikash', PHY: 'vikash', CHEM: 'vikash', BIO: 'vikash', SST: 'amit', EVS: 'ritu', COMP: 'deepak', ACT: 'sunita' };
+    const WHO: Record<string, string> = { ENG: 'anita', HIN: 'neha', MATH: 'rakesh', SCI: 'vikash', PHY: 'vikash', CHEM: 'sunita', BIO: 'sunita', SST: 'amit', EVS: 'ritu', COMP: 'deepak', ACT: 'ritu' };
     const assignments: { sectionKey: string; subject: string; teacher: number }[] = [];
     for (const [key, code] of SECTIONS.map((x) => [x[0], x[1]])) {
-      const pre = ['PG', 'NUR', 'LKG', 'UKG'].includes(code);
       for (const sc of CLASS_SUBJECTS[code]) {
         let tk = WHO[sc];
-        if (pre) tk = SECTIONS.find((x) => x[0] === key)![5];
-        else if (['1', '3'].includes(code) && ['ENG', 'MATH'].includes(sc)) tk = 'ritu';
+        // Primary classes: the class teacher takes English, Maths and EVS.
+        if (['NUR', '1', '2', '3', '4'].includes(code) && ['ENG', 'MATH', 'EVS'].includes(sc)) tk = SECTIONS.find((x) => x[0] === key)![5];
         const r = await one(`INSERT INTO teaching_assignments (section_id, subject_id, teacher_id) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING RETURNING id`, [sectionIds[key], subjects[sc], teacherIds[tk]], c);
         if (r) await reg('teaching_assignments', r.id);
         assignments.push({ sectionKey: key, subject: sc, teacher: teacherIds[tk] });
@@ -201,10 +201,10 @@ export async function seedDemo(opts: { password?: string | null; actorUserId?: n
       for (const [code, rupees, freq] of items) await c.query('INSERT INTO fee_plan_items (fee_plan_id, fee_category_id, amount_paise, frequency) VALUES ($1,$2,$3,$4)', [p.id, await cat(code), rupees * 100, freq]);
       return p.id as number;
     };
-    const plans: Record<string, number> = {
-      pre: await plan(`Preschool ${yearRow.name}`, 'preschool', null, [['ADMISSION', 2000, 'one_time'], ['PRESCHOOL', 1200, 'monthly'], ['ANNUAL', 1500, 'annual'], ['UNIFORM', 1500, 'one_time'], ['BOOKS', 1000, 'annual']]),
-    };
-    const band: Record<string, [number, number, number]> = { '1': [1400, 400, 1800], '3': [1500, 400, 2000], '5': [1600, 500, 2200], '8': [1900, 600, 2800], '10': [2300, 800, 3500], '12': [2700, 900, 4000] };
+    const plans: Record<string, number> = {};
+    const band: Record<string, [number, number, number]> = {
+      NUR: [1200, 300, 1500], '1': [1400, 400, 1800], '2': [1400, 400, 1800], '3': [1500, 400, 2000], '4': [1500, 400, 2000], '5': [1600, 500, 2200], '6': [1800, 600, 2600],
+      '7': [1800, 600, 2600], '8': [1900, 600, 2800], '9': [2200, 800, 3200], '10': [2300, 800, 3500], '11': [2600, 900, 3800], '12': [2700, 900, 4000] };
     for (const [code, [tuition, exam, books]] of Object.entries(band)) {
       plans[code] = await plan(`Class ${code} ${yearRow.name}`, 'school', code, [['ADMISSION', 3000, 'one_time'], ['TUITION', tuition, 'monthly'], ['ANNUAL', 2500, 'annual'], ['EXAM', exam, 'half_yearly'], ['UNIFORM', 1800, 'one_time'], ['BOOKS', books, 'annual']]);
     }
@@ -236,13 +236,13 @@ export async function seedDemo(opts: { password?: string | null; actorUserId?: n
 
     // ---- Students
     const yearStart = yearRow.start_date.slice(0, 4);
-    const ages: Record<string, number> = { PG: 3, NUR: 4, LKG: 5, UKG: 6, '1': 7, '3': 9, '5': 11, '8': 14, '10': 16, '12': 18 };
-    const counts: Record<string, number> = { PG: 4, NUR: 5, LKG: 5, UKG: 6, '1A': 6, '3A': 6, '5A': 8, '5B': 6, '8A': 7, '10A': 8, '12A': 6 };
+    // A small, tidy sample: 2–3 students in every class; from Class 6 upwards the first student is a hostel resident.
+    const classNo = (code: string) => (code === 'NUR' ? 0 : Number(code));
     let k = 0;
     const freeBeds = { male: hostelRooms.male.flatMap((r) => r.beds.map((b) => ({ bed: b, room: r.roomId }))), female: hostelRooms.female.flatMap((r) => r.beds.map((b) => ({ bed: b, room: r.roomId }))) };
     for (const [key, code] of SECTIONS.map((x) => [x[0], x[1]])) {
-      const pre = ['PG', 'NUR', 'LKG', 'UKG'].includes(code);
-      for (let i = 1; i <= counts[key]; i++, k++) {
+      const count = classNo(code) % 2 === 0 ? 3 : 2;
+      for (let i = 1; i <= count; i++, k++) {
         const female = k % 2 === 1;
         const fn = female ? GIRLS[k % GIRLS.length] : BOYS[k % BOYS.length];
         const ln = SURNAMES[(k * 7) % SURNAMES.length];
@@ -252,26 +252,26 @@ export async function seedDemo(opts: { password?: string | null; actorUserId?: n
         const cr = await credFor();
         const u = await one(`INSERT INTO users (username, password_hash, role, display_name, is_demo, must_change_password) VALUES ($1,$2,'student',$3,true,$4) RETURNING id`,
           [studentCode, cr.hash, `${fn} ${ln}`, cr.mustChange], c);
-        const dob = `${Number(yearStart) - ages[code]}-${String(between(1, 12)).padStart(2, '0')}-${String(between(1, 28)).padStart(2, '0')}`;
+        const dob = `${Number(yearStart) - (classNo(code) + 6)}-${String(between(1, 12)).padStart(2, '0')}-${String(between(1, 28)).padStart(2, '0')}`;
         const st = await one(`INSERT INTO students (user_id, student_code, admission_no, first_name, last_name, dob, gender, blood_group, address, emergency_contact_name, emergency_contact_phone, admission_date, is_demo)
                               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true) RETURNING id`,
           [u.id, studentCode, `${s.admission_prefix}${pad(an, 5)}`, fn, ln, dob, female ? 'female' : 'male', pick(['A+', 'B+', 'O+', 'AB+', 'B-']),
             `${between(1, 250)}, ${pick(ROADS)}, Patna`, `${FATHERS[k % FATHERS.length]} ${ln}`, `+91 9${between(100000000, 999999999)}`, yearRow.start_date], c);
         const father = await one(`INSERT INTO guardians (name, phone, occupation, is_demo) VALUES ($1,$2,$3,true) RETURNING id`, [`${FATHERS[k % FATHERS.length]} ${ln}`, `+91 9${between(100000000, 999999999)}`, pick(['Business', 'Service', 'Teacher', 'Doctor', 'Farmer', 'Engineer'])], c);
         await c.query(`INSERT INTO student_guardians (student_id, guardian_id, relation, is_primary) VALUES ($1,$2,'Father',true)`, [st.id, father.id]);
-        const hostel = ['8A', '10A', '12A'].includes(key) && i <= 3;
+        const hostel = classNo(code) >= 6 && i === 1; // hosteller; everyone else is a day scholar (school 9 to 4, then home)
         const transport = !hostel && routes.length > 0 && rand() < 0.4;
         const secRow = await one('SELECT class_level_id FROM sections WHERE id=$1', [sectionIds[key]], c);
         const e = await one(`INSERT INTO enrollments (student_id, academic_year_id, section_id, class_level_id, roll_no, residency, transport_opted, transport_route_id, enrolled_on)
                              VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,
           [st.id, Y, sectionIds[key], secRow.class_level_id, i, hostel ? 'hostel' : 'day_scholar', transport, transport ? pick(routes) : null, yearRow.start_date], c);
-        await assignPlan(c as PoolClient, e.id, pre ? plans.pre : plans[code], null);
+        await assignPlan(c as PoolClient, e.id, plans[code], null);
         if (hostel) {
           await assignPlan(c as PoolClient, e.id, plans.hostel, null);
           const bed = freeBeds[female ? 'female' : 'male'].shift();
           if (bed) await c.query('INSERT INTO hostel_allocations (student_id, bed_id, room_id, check_in, allocated_by) VALUES ($1,$2,$3,$4,$5)', [st.id, bed.bed, bed.room, yearRow.start_date, actor]);
         }
-        if (k % 9 === 0 && !pre) {
+        if (k % 9 === 0) {
           const cn = await one(`INSERT INTO concessions (enrollment_id, fee_category_id, label, kind, percent_bp, reason, approved_by) VALUES ($1,$2,'scholarship','percent',2500,'Merit scholarship (sample)',$3) RETURNING id`, [e.id, await cat('TUITION'), actor], c);
           void cn;
         }
@@ -301,13 +301,12 @@ export async function seedDemo(opts: { password?: string | null; actorUserId?: n
     }
     result.summary.attendanceRecords = att;
 
-    // ---- Exams: published unit test (marks), preschool progress card (descriptive), upcoming half-yearly
+    // ---- Exams: published Unit Test 1 and the upcoming Half Yearly examination
     const scale = await one('SELECT id FROM grading_scales WHERE is_default ORDER BY id LIMIT 1', [], c);
     const ut = await one(`INSERT INTO exams (academic_year_id, name, exam_type, assessment_mode, grading_scale_id, pass_percent, start_date, end_date, schedule_published, status, published_at, published_by)
                           VALUES ($1,'Unit Test 1','unit','marks',$2,33,$3,$4,true,'published',now(),$5) RETURNING id`, [Y, scale?.id ?? null, addDays(today, -40), addDays(today, -35), actor], c);
     await reg('exams', ut.id);
     for (const [key, code] of SECTIONS.map((x) => [x[0], x[1]])) {
-      if (['PG', 'NUR', 'LKG', 'UKG'].includes(code)) continue;
       for (const sc of CLASS_SUBJECTS[code]) {
         const es = await one(`INSERT INTO exam_subjects (exam_id, class_level_id, subject_id, max_marks, pass_marks, exam_date) VALUES ($1,$2,$3,25,8,$4)
                               ON CONFLICT (exam_id, class_level_id, subject_id) DO UPDATE SET max_marks = 25 RETURNING id`, [ut.id, await cl(code), subjects[sc], addDays(today, -40 + CLASS_SUBJECTS[code].indexOf(sc))], c);
@@ -326,23 +325,10 @@ export async function seedDemo(opts: { password?: string | null; actorUserId?: n
           pick(['Sincere and attentive in class.', 'Good progress. Needs more practice in written work.', 'Excellent participation. Keep it up!', 'Can do better with regular revision.', 'Very disciplined and hardworking.'])]);
       }
     }
-    const pa = await one(`INSERT INTO exams (academic_year_id, name, exam_type, assessment_mode, start_date, end_date, status, published_at, published_by)
-                          VALUES ($1,'Term 1 Progress Card','preschool_assessment','descriptive',$2,$3,'published',now(),$4) RETURNING id`, [Y, addDays(today, -30), addDays(today, -25), actor], c);
-    await reg('exams', pa.id);
-    const domains = await q('SELECT id FROM assessment_domains WHERE is_active', [], c);
-    for (const key of ['PG', 'NUR', 'LKG', 'UKG']) {
-      for (const st of studentsByClass[key] ?? []) {
-        for (const d of domains) {
-          await c.query(`INSERT INTO development_assessments (exam_id, student_id, enrollment_id, domain_id, rating, comment) VALUES ($1,$2,$3,$4,$5,$6)`,
-            [pa.id, st.studentId, st.enrollmentId, d.id, pick(['developing', 'proficient', 'proficient', 'excellent']), pick([null, 'Enjoys group activities', 'Recognises letters well', 'Loves drawing'])]);
-        }
-        await c.query(`INSERT INTO report_card_remarks (exam_id, student_id, teacher_remark) VALUES ($1,$2,$3)`, [pa.id, st.studentId, 'A cheerful child who is settling in well.']);
-      }
-    }
     const hy = await one(`INSERT INTO exams (academic_year_id, name, exam_type, assessment_mode, grading_scale_id, pass_percent, start_date, end_date, schedule_published, status)
                           VALUES ($1,'Half Yearly Examination','half_yearly','marks',$2,33,$3,$4,true,'marks_entry') RETURNING id`, [Y, scale?.id ?? null, addDays(today, 10), addDays(today, 18), ], c);
     await reg('exams', hy.id);
-    for (const code of ['1', '3', '5', '8', '10', '12']) {
+    for (const code of Object.keys(CLASS_SUBJECTS)) {
       let n = 0;
       for (const sc of CLASS_SUBJECTS[code]) {
         await c.query(`INSERT INTO exam_subjects (exam_id, class_level_id, subject_id, max_marks, pass_marks, exam_date, start_time, duration_min) VALUES ($1,$2,$3,80,27,$4,'09:00',180)`,
@@ -396,7 +382,7 @@ export async function seedDemo(opts: { password?: string | null; actorUserId?: n
 
     // ---- Notices, events and enquiries
     const NOTICES: [string, string, string, string, boolean][] = [
-      ['Admissions open for the new session', 'नए सत्र के लिए प्रवेश प्रारंभ', 'Admissions are open from Playgroup to Class 12. Visit the school office between 9 AM and 2 PM or fill the online enquiry form.', 'public', true],
+      ['Admissions open for the new session', 'नए सत्र के लिए प्रवेश प्रारंभ', 'Admissions are open from Nursery to Class 12 for day scholars and hostel residents. Visit the school office between 9 AM and 2 PM or fill the online enquiry form.', 'public', true],
       ['Parent–Teacher Meeting on Saturday', 'शनिवार को अभिभावक–शिक्षक बैठक', 'All parents are requested to attend the PTM from 10 AM to 1 PM to discuss the Unit Test 1 performance.', 'all', false],
       ['Half Yearly Examination schedule released', 'अर्धवार्षिक परीक्षा कार्यक्रम जारी', 'The date sheet for the Half Yearly Examination is now available in the student portal.', 'students', false],
       ['Annual Sports Day registrations', 'वार्षिक खेल दिवस पंजीकरण', 'Students interested in athletics events should give their names to their class teacher by Friday.', 'public', false],
@@ -417,7 +403,7 @@ export async function seedDemo(opts: { password?: string | null; actorUserId?: n
         [t, th, type, addDays(today, a), b ? addDays(today, b) : null, loc || null, actor], c);
       await reg('events', r.id);
     }
-    for (const [child, cls, parent] of [['Advik Raj', 'LKG', 'Pankaj Raj'], ['Ira Sinha', 'Class 1', 'Neeraj Sinha'], ['Om Prakash', 'Class 9', 'Ram Prakash']]) {
+    for (const [child, cls, parent] of [['Advik Raj', 'Class 2', 'Pankaj Raj'], ['Ira Sinha', 'Class 1', 'Neeraj Sinha'], ['Om Prakash', 'Class 9', 'Ram Prakash']]) {
       const r = await one(`INSERT INTO admission_enquiries (student_name, class_sought, parent_name, phone, message) VALUES ($1,$2,$3,'+91 90000 44444','Please share the fee structure and admission process.') RETURNING id`, [child, cls, parent], c);
       await reg('admission_enquiries', r.id);
     }

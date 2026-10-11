@@ -29,7 +29,8 @@ describe('School setup', () => {
     T.yearId = y.id;
     const lk = await lookup(admin);
     const cls = (code: string) => lk.classes.find((c: any) => c.code === code).id;
-    T.cls = { NUR: cls('NUR'), C5: cls('5'), C6: cls('6'), C10: cls('10') };
+    T.cls = { NUR: cls('LKG'), // a preschool level (deactivated by default, but preschool rules stay supported)
+       C5: cls('5'), C6: cls('6'), C10: cls('10') };
     const board = lk.boards.find((b: any) => b.code === 'CBSE').id;
     const medium = lk.mediums.find((m: any) => m.code === 'EN').id;
     const sec = async (classLevelId: number, name: string, yearId = T.yearId) =>

@@ -1,6 +1,6 @@
 # Future Creations Public School – School Management System
 
-A full-stack school ERP for a school with **Preschool (Playgroup–UKG) through Class 12**, CBSE/BSEB boards,
+A full-stack school ERP for a school with **Nursery to Class 12** (preschool levels can be switched on if ever needed), CBSE/BSEB boards,
 English/Hindi medium, hostel residents, day scholars and optional transport. It includes a public website,
 and portals for the **Principal/Administrator** (plus an optional Accountant role), **Teachers** and **Students**.
 
@@ -63,8 +63,8 @@ No other paid service is required.
 
 ### Sample data for demonstrations
 Sign in as Principal → **Settings → Sample data**, choose one password for all sample accounts and click **Load sample data**.
-It creates 9 teachers, ~70 students (Playgroup–Class 12), a timetable, a month of attendance, invoices and payments, published
-Unit Test results, preschool progress cards, homework, quizzes, notices and events, and lists the sample login IDs.
+It creates 9 teachers, 2–3 students in every class from Nursery to Class 12 (day scholars and hostellers), a timetable, a month of attendance, invoices and payments, published
+Unit Test results, hostel allocations, homework, quizzes, notices and events, and lists the sample login IDs.
 **Remove sample data** (same page) deletes only those tagged records — real records are never touched. A banner on the dashboard
 reminds you while sample data is loaded. (CLI alternative: `DEMO_PASSWORD=... node dist/server/cli.js seed-demo` / `remove-demo`.)
 

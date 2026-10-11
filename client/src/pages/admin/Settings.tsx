@@ -207,8 +207,8 @@ function DemoData() {
     <Async q={q}>{(st) => (
       <div className="grid gap-4 lg:grid-cols-2">
         <Card title="Sample data for demonstrations">
-          <p className="text-sm text-slate-600">Loads a complete example school so you can show the system to others: 9 teachers, about 70 students from Playgroup to Class 12, timetable,
-            a month of attendance, fee invoices and payments, published Unit Test results, preschool progress cards, homework, quizzes, notices and events.</p>
+          <p className="text-sm text-slate-600">Loads a complete example school so you can show the system to others: 9 teachers, 2–3 students in every class from Nursery to Class 12 (day scholars and hostellers), timetable,
+            a month of attendance, fee invoices and payments, published Unit Test results, hostel allocations, homework, quizzes, notices and events.</p>
           <p className="mt-2 text-sm text-slate-600">Every sample record is tagged, so <b>Remove sample data</b> deletes only these records — your real students, teachers and payments are never touched.</p>
           {st.loaded ? (
             <div className="mt-4 space-y-3">

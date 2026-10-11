@@ -35,6 +35,7 @@ function Sections() {
         <DataTable rows={q.data} search={(r) => `${r.class_name} ${r.name} ${r.class_teacher_name ?? ''}`}
           toolbar={<>
             <select className="input w-36" value={y ?? ''} onChange={(e) => setYearId(Number(e.target.value))}>{lk?.years.map((yy) => <option key={yy.id} value={yy.id}>{yy.name}</option>)}</select>
+            <button className="btn-secondary" disabled={busy || !y} onClick={() => run(() => api.post('/api/academics/sections/defaults', { academicYearId: y }), { success: 'Section A created for every class that had no section.' })}>Create sections for all classes</button>
             <button className="btn-primary" onClick={() => setEdit({ academicYearId: y, classLevelId: '', name: 'A', boardId: lk?.boards[0]?.id ?? '', mediumId: lk?.mediums[0]?.id ?? '', classTeacherId: '', capacity: '40', room: '' })}><Plus className="h-4 w-4" />Section</button>
           </>}
           columns={[

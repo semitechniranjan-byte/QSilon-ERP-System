@@ -68,7 +68,6 @@ export async function seedDemo(opts: { password?: string | null; actorUserId?: n
       const y = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
       yearRow = await one(`INSERT INTO academic_years (name, start_date, end_date, is_current, status) VALUES ($1,$2,$3,true,'active') RETURNING *`,
         [`${y}-${String(y + 1).slice(2)}`, `${y}-04-01`, `${y + 1}-03-31`], c);
-      await reg('academic_years', yearRow.id);
     }
     const Y = yearRow.id;
     const termCount = await one('SELECT count(*) AS n FROM terms WHERE academic_year_id = $1', [Y], c);
@@ -76,7 +75,6 @@ export async function seedDemo(opts: { password?: string | null; actorUserId?: n
       const y0 = Number(yearRow.start_date.slice(0, 4));
       for (const [n, a, b] of [['Term 1', `${y0}-04-01`, `${y0}-09-30`], ['Term 2', `${y0}-10-01`, `${y0 + 1}-03-31`]]) {
         const t = await one('INSERT INTO terms (academic_year_id, name, start_date, end_date) VALUES ($1,$2,$3,$4) RETURNING id', [Y, n, a, b], c);
-        await reg('terms', t.id);
       }
     }
     const cl = async (code: string) => (await one('SELECT id FROM class_levels WHERE code=$1', [code], c)).id as number;
@@ -89,7 +87,7 @@ export async function seedDemo(opts: { password?: string | null; actorUserId?: n
       ['SST', 'Social Science', 'सामाजिक विज्ञान'], ['EVS', 'Environmental Studies', 'पर्यावरण अध्ययन'], ['COMP', 'Computer', 'कंप्यूटर'],
       ['PHY', 'Physics', 'भौतिकी'], ['CHEM', 'Chemistry', 'रसायन'], ['BIO', 'Biology', 'जीव विज्ञान'], ['ACT', 'Activities', 'गतिविधियाँ']]) {
       let r = await one('SELECT id FROM subjects WHERE code=$1', [code], c);
-      if (!r) { r = await one('INSERT INTO subjects (code, name, name_hi) VALUES ($1,$2,$3) RETURNING id', [code, name, hi], c); await reg('subjects', r.id); }
+      if (!r) { r = await one('INSERT INTO subjects (code, name, name_hi) VALUES ($1,$2,$3) RETURNING id', [code, name, hi], c); }
       subjects[code] = r.id;
     }
 
@@ -132,7 +130,6 @@ export async function seedDemo(opts: { password?: string | null; actorUserId?: n
       if (!r) {
         r = await one(`INSERT INTO sections (academic_year_id, class_level_id, name, board_id, medium_id, class_teacher_id, capacity, room) VALUES ($1,$2,$3,$4,$5,$6,40,$7) RETURNING id`,
           [Y, await cl(code), name, await boardId(b), await mediumId(m), teacherIds[ct], `Room ${100 + Object.keys(sectionIds).length + 1}`], c);
-        await reg('sections', r.id);
       }
       sectionIds[key] = r.id;
     }
@@ -144,8 +141,7 @@ export async function seedDemo(opts: { password?: string | null; actorUserId?: n
     };
     for (const [code, subs] of Object.entries(CLASS_SUBJECTS)) {
       for (const sc of subs) {
-        const r = await one(`INSERT INTO class_subjects (academic_year_id, class_level_id, subject_id) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING RETURNING id`, [Y, await cl(code), subjects[sc]], c);
-        if (r) await reg('class_subjects', r.id);
+        await one(`INSERT INTO class_subjects (academic_year_id, class_level_id, subject_id) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING RETURNING id`, [Y, await cl(code), subjects[sc]], c);
       }
     }
     const WHO: Record<string, string> = { ENG: 'anita', HIN: 'neha', MATH: 'rakesh', SCI: 'vikash', PHY: 'vikash', CHEM: 'sunita', BIO: 'sunita', SST: 'amit', EVS: 'ritu', COMP: 'deepak', ACT: 'ritu' };
@@ -168,7 +164,6 @@ export async function seedDemo(opts: { password?: string | null; actorUserId?: n
         [4, 'Lunch', '10:00', '10:30', true], [5, 'Period 4', '10:30', '11:10', false], [6, 'Period 5', '11:10', '11:50', false], [7, 'Period 6', '11:50', '12:30', false]];
       for (const [n, l, a, b, br] of P) {
         const r = await one('INSERT INTO timetable_periods (academic_year_id, period_no, label, start_time, end_time, is_break) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id', [Y, n, l, a, b, br], c);
-        await reg('timetable_periods', r.id);
       }
       const periods = await q('SELECT id, is_break FROM timetable_periods WHERE academic_year_id=$1 ORDER BY period_no', [Y], c);
       const busy = new Set<string>();
@@ -491,6 +486,7 @@ export async function removeDemo(log: (m: string) => void = console.log) {
     ];
     for (const sql of steps) await c.query(sql);
     // Configuration rows created by the seed, unless real records still use them.
+    // School structure (academic year, sections, subjects, bell schedule) is kept so the school stays ready to use.
     const order = ['notices', 'events', 'admission_enquiries', 'exams', 'hostel_beds', 'hostel_rooms', 'hostels', 'transport_routes', 'fee_plans', 'teaching_assignments',
       'class_subjects', 'timetable_periods', 'sections', 'terms', 'subjects', 'academic_years'];
     for (const table of order) {
@@ -524,6 +520,9 @@ export async function removeDemo(log: (m: string) => void = console.log) {
     }
     await c.query(`DELETE FROM users WHERE is_demo`);
   });
+  // Older sample data may have created the academic year; make sure the school is never left without classes.
+  const { bootstrapAcademics } = await import('../services/setup.js');
+  await bootstrapAcademics(log);
   log('Sample data removed.');
   void pool;
 }

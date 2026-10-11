@@ -41,6 +41,18 @@ academicsRouter.post('/sections', requirePerm('academics.manage'), ah(async (req
   await audit(req, 'section.create', 'section', row.id, b);
   res.status(201).json(row);
 }));
+/** Create Section A (with default subjects) for every active class that has no section in the year. */
+academicsRouter.post('/sections/defaults', requirePerm('academics.manage'), ah(async (req, res) => {
+  const b = z.object({ academicYearId: id, sectionName: z.string().trim().regex(/^[A-Za-z0-9]{1,10}$/).default('A') }).parse(req.body);
+  const { createDefaultSections } = await import('../services/setup.js');
+  const created = await tx(async (c) => {
+    const n = await createDefaultSections(c, b.academicYearId, { sectionName: b.sectionName.toUpperCase() });
+    await audit(req, 'section.create_defaults', 'academic_year', b.academicYearId, { created: n }, c);
+    return n;
+  });
+  res.json({ created });
+}));
+
 academicsRouter.put('/sections/:id', requirePerm('academics.manage'), ah(async (req, res) => {
   const sid = id.parse(req.params.id);
   const b = sectionSchema.omit({ academicYearId: true, classLevelId: true }).parse(req.body);

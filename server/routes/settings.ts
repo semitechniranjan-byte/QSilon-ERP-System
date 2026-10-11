@@ -86,6 +86,11 @@ settingsRouter.post('/years', requirePerm('settings.manage'), ah(async (req, res
      VALUES ($1,$2,$3,$4, NOT EXISTS (SELECT 1 FROM academic_years WHERE is_current)) RETURNING *`,
     [b.name, b.startDate, b.endDate, b.status ?? 'planned'],
   );
+  if (row.is_current) {
+    // First academic year: get the school ready to use with Section A in every class.
+    const { createDefaultSections } = await import('../services/setup.js');
+    await createDefaultSections(pool, row.id);
+  }
   await audit(req, 'academic_year.create', 'academic_year', row.id, b);
   res.status(201).json(row);
 }));

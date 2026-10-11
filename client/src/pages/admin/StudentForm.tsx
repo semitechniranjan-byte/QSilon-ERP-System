@@ -138,6 +138,13 @@ export default function StudentForm() {
 
         {!editing && (
           <>
+            {lk && (!lk.years.length || !sectionsFor(yearId).length) && (
+              <div className="card border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                {!lk.years.length
+                  ? <>No academic year has been created yet. <a className="link" href="/admin/settings">Create the academic year</a> (Settings → Academic years) — Section A for every class (Nursery to Class 12) is created automatically.</>
+                  : <>No classes/sections exist for this academic year yet. Go to <a className="link" href="/admin/classes">Classes &amp; Sections</a> and click <b>Create sections for all classes</b>.</>}
+              </div>
+            )}
             <Card title="Class, residency & transport">
               <div className="grid gap-4 md:grid-cols-3">
                 <Field label={t('Academic Year')}>

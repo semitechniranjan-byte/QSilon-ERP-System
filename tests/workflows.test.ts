@@ -33,12 +33,15 @@ describe('School setup', () => {
        C5: cls('5'), C6: cls('6'), C10: cls('10') };
     const board = lk.boards.find((b: any) => b.code === 'CBSE').id;
     const medium = lk.mediums.find((m: any) => m.code === 'EN').id;
-    const sec = async (classLevelId: number, name: string, yearId = T.yearId) =>
-      ok(await admin.post('/api/academics/sections', { academicYearId: yearId, classLevelId, name, boardId: board, mediumId: medium, capacity: 40 }), 201).id;
+    // Creating the first year auto-creates Section A for active classes; reuse those, create the rest.
+    const sec = async (classLevelId: number, name: string, yearId = T.yearId) => {
+      const existing = ok(await admin.get('/api/settings/lookups')).sections.find((x: any) => x.academic_year_id === yearId && x.class_level_id === classLevelId && x.name === name);
+      return existing ? existing.id : ok(await admin.post('/api/academics/sections', { academicYearId: yearId, classLevelId, name, boardId: board, mediumId: medium, capacity: 40 }), 201).id;
+    };
     T.secNur = await sec(T.cls.NUR, 'A');
     T.sec5A = await sec(T.cls.C5, 'A');
     T.sec10A = await sec(T.cls.C10, 'A');
-    const sub = async (code: string, name: string) => ok(await admin.post('/api/settings/subjects', { code, name }), 201).id;
+    const sub = async (code: string, name: string) => lk.subjects.find((x: any) => x.code === code)?.id ?? ok(await admin.post('/api/settings/subjects', { code, name }), 201).id;
     T.ENG = await sub('ENG', 'English'); T.MATH = await sub('MATH', 'Mathematics'); T.ACT = await sub('ACT', 'Activities');
     ok(await admin.put('/api/academics/class-subjects', { academicYearId: T.yearId, classLevelId: T.cls.C5, subjects: [{ subjectId: T.ENG }, { subjectId: T.MATH }] }));
     ok(await admin.put('/api/academics/class-subjects', { academicYearId: T.yearId, classLevelId: T.cls.NUR, subjects: [{ subjectId: T.ENG }, { subjectId: T.ACT }] }));

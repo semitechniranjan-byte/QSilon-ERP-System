@@ -45,6 +45,26 @@ describe('account protection', () => {
   });
 });
 
+describe('first-start academic setup', () => {
+  it('creates the current year with Section A for Nursery to Class 12', async () => {
+    const { bootstrapAcademics } = await import('../server/services/setup.js');
+    await bootstrapAcademics(() => {});
+    await bootstrapAcademics(() => {}); // idempotent
+    const admin = await new Client(app).login('principal', 'Principal123');
+    const lk = ok(await admin.get('/api/settings/lookups'));
+    expect(lk.years).toHaveLength(1);
+    const names = lk.sections.map((s: any) => s.class_name);
+    expect(names[0]).toBe('Nursery');
+    expect(names).toContain('Class 12');
+    expect(names).not.toContain('LKG');
+    expect(lk.sections).toHaveLength(13);
+    const cs = ok(await admin.get('/api/academics/class-subjects'));
+    expect(cs.length).toBeGreaterThan(40);
+    // The button creates sections only where a class has none.
+    expect(ok(await admin.post('/api/academics/sections/defaults', { academicYearId: lk.years[0].id })).created).toBe(0);
+  });
+});
+
 describe('demo data', () => {
   it('can be seeded and removed without touching real records', async () => {
     const { removeDemo } = await import('../server/seed/demo.js');
@@ -74,5 +94,8 @@ describe('demo data', () => {
     expect((await pool.query('SELECT id FROM students WHERE id = $1', [real.student.id])).rows).toHaveLength(1);
     expect((await pool.query('SELECT id FROM sections WHERE id = $1', [sec.id])).rows).toHaveLength(1);
     expect((await pool.query(`SELECT count(*)::int AS n FROM exams`)).rows[0].n).toBe(0);
+    // School structure stays after removing sample data.
+    expect((await pool.query(`SELECT count(*)::int AS n FROM sections`)).rows[0].n).toBeGreaterThanOrEqual(13);
+    expect((await pool.query(`SELECT count(*)::int AS n FROM academic_years`)).rows[0].n).toBe(1);
   }, 180000);
 });

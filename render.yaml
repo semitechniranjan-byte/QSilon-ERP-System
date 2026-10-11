@@ -1,0 +1,22 @@
+# Render Blueprint. Connect this repo in Render (New > Blueprint) or create the web service manually
+# with the same settings. DATABASE_URL must point at your existing Render PostgreSQL database.
+services:
+  - type: web
+    name: school-management-system
+    runtime: node
+    plan: starter
+    buildCommand: npm ci --include=dev && npm run build
+    preDeployCommand: npm run migrate:prod
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false # paste your Render Postgres *Internal Database URL* in the dashboard
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: SETUP_TOKEN
+        sync: false

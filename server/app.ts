@@ -55,7 +55,7 @@ export function createApp() {
     resave: false,
     saveUninitialized: false,
     rolling: true,
-    cookie: { httpOnly: true, sameSite: 'lax', secure: config.isProd, maxAge: config.sessionMaxAgeMs },
+    cookie: { httpOnly: true, sameSite: 'lax', secure: process.env.COOKIE_SECURE ? process.env.COOKIE_SECURE === 'true' : config.isProd, maxAge: config.sessionMaxAgeMs },
   }));
 
   const api = express.Router();

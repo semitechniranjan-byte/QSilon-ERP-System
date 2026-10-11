@@ -126,7 +126,7 @@ authRouter.post('/change-password', ah(async (req, res) => {
   res.json({ ok: true });
 }));
 
-authRouter.patch('/language', ah(async (req, res) => {
+authRouter.post('/language', ah(async (req, res) => {
   if (!req.user) throw new HttpError(401, 'Please sign in.');
   const { language } = z.object({ language: z.enum(['en', 'hi']) }).parse(req.body);
   await pool.query('UPDATE users SET preferred_language = $2 WHERE id = $1', [req.user.id, language]);

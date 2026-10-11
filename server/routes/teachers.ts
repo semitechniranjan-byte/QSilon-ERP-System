@@ -56,6 +56,18 @@ teachersRouter.post('/attendance', requirePerm('teachers.manage'), ah(async (req
   res.json({ ok: true });
 }));
 
+/** A teacher's own profile (no other teacher's data). */
+teachersRouter.get('/self/profile', ah(async (req, res) => {
+  if (req.user!.role !== 'teacher' || !req.user!.teacherId) throw notFound();
+  const t = await one(`SELECT id, employee_code, first_name, last_name, gender, dob, phone, email, address, qualification, experience_years, designation, joining_date, photo_file_id, status
+                         FROM teachers WHERE id = $1`, [req.user!.teacherId]);
+  const assignments = await q(
+    `SELECT ta.id, sub.name AS subject, cl.name AS class_name, s.name AS section FROM teaching_assignments ta JOIN subjects sub ON sub.id = ta.subject_id
+       JOIN sections s ON s.id = ta.section_id JOIN class_levels cl ON cl.id = s.class_level_id JOIN academic_years y ON y.id = s.academic_year_id AND y.is_current
+      WHERE ta.teacher_id = $1 ORDER BY cl.sort_order, s.name, sub.name`, [req.user!.teacherId]);
+  res.json({ ...t, assignments });
+}));
+
 teachersRouter.get('/:id', requirePerm('teachers.manage'), ah(async (req, res) => {
   const tid = id.parse(req.params.id);
   const t = await one(`SELECT t.*, u.username, u.is_active AS login_active, u.last_login_at, u.must_change_password FROM teachers t LEFT JOIN users u ON u.id = t.user_id WHERE t.id = $1`, [tid]);

@@ -5,6 +5,7 @@ services:
     name: school-management-system
     runtime: node
     plan: starter
+    region: singapore # must match your PostgreSQL region so the Internal Database URL works
     buildCommand: npm ci --include=dev && npm run build
     preDeployCommand: npm run migrate:prod
     startCommand: npm start

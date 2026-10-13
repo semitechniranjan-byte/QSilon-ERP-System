@@ -76,25 +76,25 @@ export function PublicLayout({ children }: { children?: ReactNode }) {
         )}
       </header>
       <main className="flex-1">{children ?? <Outlet />}</main>
-      <footer className="bg-brand-900 text-brand-100">
+      <footer className="border-t border-brand-100 bg-brand-50 text-slate-600">
         <div className="mx-auto grid max-w-7xl gap-8 px-4 py-10 md:grid-cols-3">
           <div>
-            <p className="text-lg font-semibold text-white">{name}</p>
-            {s?.tagline && <p className="mt-1 text-sm text-brand-200">{pick(s.tagline, s.taglineHi)}</p>}
+            <p className="text-lg font-semibold text-brand-900">{name}</p>
+            {s?.tagline && <p className="mt-1 text-sm text-slate-500">{pick(s.tagline, s.taglineHi)}</p>}
           </div>
           <div className="space-y-2 text-sm">
             {s?.address && <p className="flex gap-2"><MapPin className="mt-0.5 h-4 w-4 shrink-0" />{[s.address, s.city, s.state, s.pincode].filter(Boolean).join(', ')}</p>}
-            {s?.phone && <p className="flex gap-2"><Phone className="h-4 w-4" /><a href={`tel:${s.phone}`} className="hover:text-white">{s.phone}</a></p>}
-            {s?.email && <p className="flex gap-2"><Mail className="h-4 w-4" /><a href={`mailto:${s.email}`} className="hover:text-white">{s.email}</a></p>}
+            {s?.phone && <p className="flex gap-2"><Phone className="h-4 w-4" /><a href={`tel:${s.phone}`} className="hover:text-brand-700">{s.phone}</a></p>}
+            {s?.email && <p className="flex gap-2"><Mail className="h-4 w-4" /><a href={`mailto:${s.email}`} className="hover:text-brand-700">{s.email}</a></p>}
             {s?.schoolHours && <p className="flex gap-2"><Clock className="h-4 w-4" />{pick(s.schoolHours, s.schoolHoursHi)}</p>}
           </div>
           <div className="grid grid-cols-2 gap-1 text-sm">
-            {nav.slice(1).map(([to, label]) => <Link key={to} to={to} className="hover:text-white">{t(label)}</Link>)}
-            <Link to="/admission" className="hover:text-white">{t('Admission Enquiry')}</Link>
-            <Link to="/login" className="hover:text-white">{t('Login')}</Link>
+            {nav.slice(1).map(([to, label]) => <Link key={to} to={to} className="hover:text-brand-700">{t(label)}</Link>)}
+            <Link to="/admission" className="hover:text-brand-700">{t('Admission Enquiry')}</Link>
+            <Link to="/login" className="hover:text-brand-700">{t('Login')}</Link>
           </div>
         </div>
-        <div className="border-t border-brand-800 py-4 text-center text-xs text-brand-300">© {new Date().getFullYear()} {name}</div>
+        <div className="border-t border-brand-100 py-4 text-center text-xs text-slate-500">© {new Date().getFullYear()} {name}</div>
       </footer>
     </div>
   );

@@ -29,8 +29,8 @@ function HeroVisual({ photos, initials, caption }: { photos: { id: number; title
   if (!photos.length) {
     return (
       <div className="relative mx-auto w-full max-w-xl">
-        <div className="absolute -inset-3 rotate-2 rounded-[2rem] bg-accent-400/80" aria-hidden />
-        <SchoolIllustration initials={initials} className="relative w-full rounded-[1.75rem] shadow-2xl ring-4 ring-white/20" />
+        <div className="absolute -inset-3 rotate-2 rounded-[2rem] bg-accent-400/50" aria-hidden />
+        <SchoolIllustration initials={initials} className="relative w-full rounded-[1.75rem] shadow-2xl ring-4 ring-white" />
         <div className="absolute -bottom-5 left-3 flex items-center sm:-left-5 gap-3 rounded-2xl bg-white px-4 py-3 text-slate-800 shadow-xl">
           <div className="rounded-xl bg-accent-400/20 p-2 text-accent-600"><GraduationCap className="h-5 w-5" /></div>
           <div><p className="text-sm font-semibold leading-tight">{caption}</p><p className="text-xs text-slate-500">{lang === 'hi' ? 'दैनिक विद्यार्थी एवं छात्रावासी' : 'Day scholars & hostellers'}</p></div>
@@ -41,8 +41,8 @@ function HeroVisual({ photos, initials, caption }: { photos: { id: number; title
   const go = (d: number) => setI((x) => (x + d + photos.length) % photos.length);
   return (
     <div className="relative mx-auto w-full max-w-xl">
-      <div className="absolute -inset-3 rotate-2 rounded-[2rem] bg-accent-400/80" aria-hidden />
-      <div className="relative aspect-[4/3] overflow-hidden rounded-[1.75rem] shadow-2xl ring-4 ring-white/20">
+      <div className="absolute -inset-3 rotate-2 rounded-[2rem] bg-accent-400/50" aria-hidden />
+      <div className="relative aspect-[4/3] overflow-hidden rounded-[1.75rem] shadow-2xl ring-4 ring-white">
         {photos.map((p, k) => (
           <img key={p.id} src={`/api/files/${p.id}`} alt={p.title} loading={k ? 'lazy' : 'eager'}
             className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-1000 ${k === i ? 'opacity-100' : 'opacity-0'}`} />
@@ -94,26 +94,26 @@ export default function Home() {
   return (
     <>
       {/* Hero */}
-      <section className="relative overflow-hidden bg-brand-800 text-white">
-        <div className="absolute inset-0 bg-gradient-to-br from-brand-900 via-brand-800/95 to-brand-600/80" />
-        <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-accent-400/20 blur-3xl" aria-hidden />
-        <div className="absolute -bottom-32 left-10 h-72 w-72 rounded-full bg-brand-400/30 blur-3xl" aria-hidden />
+      <section className="relative overflow-hidden bg-brand-50 text-slate-800">
+        <div className="absolute inset-0 bg-gradient-to-br from-white via-brand-50 to-amber-50" />
+        <div className="absolute -right-24 -top-24 h-80 w-80 rounded-full bg-accent-400/25 blur-3xl" aria-hidden />
+        <div className="absolute -bottom-32 left-10 h-72 w-72 rounded-full bg-brand-200/60 blur-3xl" aria-hidden />
         <div className="relative mx-auto grid max-w-7xl items-center gap-10 px-4 py-14 sm:py-20 lg:grid-cols-2 lg:gap-16">
           <div>
-            <p className="mb-4 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-accent-400 ring-1 ring-white/20">
+            <p className="mb-4 inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-semibold text-accent-600 shadow-sm ring-1 ring-accent-400/40">
               <Star className="h-3.5 w-3.5" />{lang === 'hi' ? `प्रवेश प्रारंभ · ${rangeTo}` : `Admissions open · ${rangeTo}`}</p>
-            <h1 className="text-4xl font-extrabold leading-tight tracking-tight sm:text-5xl xl:text-6xl">{name}</h1>
-            {s.tagline && <p className="mt-4 max-w-xl text-lg text-brand-100">{pick(s.tagline, s.taglineHi)}</p>}
+            <h1 className="text-4xl font-extrabold leading-tight tracking-tight text-brand-900 sm:text-5xl xl:text-6xl">{name}</h1>
+            {s.tagline && <p className="mt-4 max-w-xl text-lg text-slate-600">{pick(s.tagline, s.taglineHi)}</p>}
             <div className="mt-8 flex flex-wrap gap-3">
-              <Link to="/admission" className="btn bg-accent-500 px-5 py-2.5 text-brand-900 hover:bg-accent-400">{t('Apply for Admission')} <ArrowRight className="h-4 w-4" /></Link>
-              <Link to="/about" className="btn border border-white/40 px-5 py-2.5 text-white hover:bg-white/10">{t('Read more')}</Link>
+              <Link to="/admission" className="btn bg-accent-500 px-5 py-2.5 text-brand-900 shadow-md hover:bg-accent-400">{t('Apply for Admission')} <ArrowRight className="h-4 w-4" /></Link>
+              <Link to="/about" className="btn border border-brand-200 bg-white px-5 py-2.5 text-brand-700 hover:bg-brand-50">{t('Read more')}</Link>
             </div>
             {statItems.length > 0 && (
               <dl className="mt-10 flex max-w-xl flex-wrap gap-3">
                 {statItems.map(([label, value, Icon]) => (
-                  <div key={label} className="flex min-w-[9rem] flex-1 items-center gap-3 rounded-2xl bg-white/10 px-4 py-3 ring-1 ring-white/15 backdrop-blur">
-                    <Icon className="h-6 w-6 shrink-0 text-accent-400" />
-                    <div><dd className="text-2xl font-bold leading-none text-white">{value}{label === t('Years of excellence') ? '+' : ''}</dd><dt className="mt-1 text-xs text-brand-100">{label}</dt></div>
+                  <div key={label} className="flex min-w-[9rem] flex-1 items-center gap-3 rounded-2xl bg-white px-4 py-3 shadow-sm ring-1 ring-brand-100">
+                    <Icon className="h-6 w-6 shrink-0 text-accent-500" />
+                    <div><dd className="text-2xl font-bold leading-none text-brand-900">{value}{label === t('Years of excellence') ? '+' : ''}</dd><dt className="mt-1 text-xs text-slate-500">{label}</dt></div>
                   </div>
                 ))}
               </dl>
@@ -145,10 +145,10 @@ export default function Home() {
         </div>
         <div className="space-y-4 lg:col-span-2">
           {(s.mission || s.missionHi) && (
-            <div className="rounded-2xl bg-gradient-to-br from-brand-600 to-brand-800 p-6 text-white shadow-md">
-              <HeartHandshake className="h-7 w-7 text-accent-400" />
-              <h3 className="mt-3 font-semibold">{t('Our Mission')}</h3>
-              <Paragraphs text={pick(s.mission, s.missionHi)} className="mt-2 text-brand-100" />
+            <div className="rounded-2xl bg-gradient-to-br from-amber-50 to-brand-50 p-6 text-slate-800 ring-1 ring-brand-100">
+              <HeartHandshake className="h-7 w-7 text-accent-500" />
+              <h3 className="mt-3 font-semibold text-brand-900">{t('Our Mission')}</h3>
+              <Paragraphs text={pick(s.mission, s.missionHi)} className="mt-2 text-slate-600" />
             </div>
           )}
           {s.principalName && <div className="rounded-2xl border border-slate-200 p-5"><p className="text-sm text-slate-500">{lang === 'hi' ? 'प्रधानाचार्य' : 'Principal'}</p><p className="font-semibold text-slate-800">{s.principalName}</p></div>}
